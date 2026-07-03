@@ -76,6 +76,8 @@ An agent for large, ambiguous, or multi-part goals where parallel planning, impl
 
 Orchestrate is designed to batch ready work. After contracts or handoff files exist, it should dispatch every safe, non-overlapping coder slice in the same grouped task batch instead of making you wait through avoidable one-agent-at-a-time phases.
 
+Before it announces an implementation phase, Orchestrate should decide the ready batch first. A "parallel" phase should normally mean one `group` call with multiple coder tasks already in `calls`, using compact `handoff_files` instead of long duplicated prompts.
+
 In normal CLI/TUI, app, and desktop usage, Orchestrate can use the `question` tool when its permissions allow it. Other runtime clients may hide `question` unless `OPENCODE_ENABLE_QUESTION_TOOL` is enabled.
 
 ---

@@ -211,6 +211,9 @@ describe("tool.group", () => {
       expect(def.description).toContain("Do not run engine first, then CLI, then tests")
       expect(def.description).toContain("Use descriptive group.name and calls[].name values")
       expect(def.description).toContain("distinguish completed, failed, aborted, and blocked calls")
+      expect(def.description).toContain("Batch before narration")
+      expect(def.description).toContain("If only one nested coder call is ready")
+      expect(def.description).toContain("reclassify deferred slices once")
     }),
   )
 

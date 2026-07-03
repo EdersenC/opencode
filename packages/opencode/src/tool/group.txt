@@ -30,6 +30,9 @@ Usage notes:
 25. Use descriptive group.name and calls[].name values because users see those labels while work is running.
 26. Keep the user experience smooth: point coder tasks at handoff_files, keep prompts short, and avoid making the user wait through avoidable serial batches.
 27. Group summaries distinguish completed, failed, aborted, and blocked calls. Treat aborted as cancelled work, not as a normal task failure.
+28. Batch before narration. Decide the full ready sibling set first, then emit the group call. Do not narrate a "parallel phase" and then send only one coder when other ready slices exist.
+29. If only one nested coder call is ready, consider using task directly unless you need group metadata, grouped blocked-result handling, or a deliberately grouped single result.
+30. After any foundation or shared-contract task completes, reclassify deferred slices once and launch every now-ready coder slice in the next group instead of drip-feeding follow-up work.
 
 Example input:
 

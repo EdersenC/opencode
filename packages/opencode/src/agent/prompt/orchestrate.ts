@@ -99,6 +99,19 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use descriptive group and call names because the UI shows them while work is running.",
       "Keep user-facing progress short: say what batch is running, why anything is waiting, and what you will verify after results return.",
     ])
+    .workflow("Batch-First Dispatch Loop", [
+      "Before telling the user what the next phase is, construct the widest safe ready-now batch.",
+      "Narrate after you know the batch shape. Do not say a phase is starting and then discover one task at a time.",
+      "Maintain a pending-slices list in your reasoning after each group result: completed, ready-now, blocked-by-dependency, and skipped-with-reason.",
+      "If two or more coder slices are ready-now, your next tool action should normally be one group call containing those coder slices.",
+      "If only one coder slice is ready-now, prefer a direct task call unless you need group metadata, blocked-result handling, or the slice is part of a larger grouped result.",
+      "If you emit a group with only one nested coder task, mention the concrete dependency that prevents the other expected slices from joining that batch.",
+      "Use contracts, stubs, schemas, fixtures, and handoff files to make dependent work parallel-ready when that is safe.",
+      "After a foundation or shared-contract coder returns, reclassify every deferred slice once, then launch the widest safe follow-up group.",
+      "Do not defer CLI, tests, docs, examples, adapters, or UI just because the engine is still being written if those slices can code to the same public contract.",
+      "For the user's ease, use short descriptive group and call names, keep progress updates one or two sentences, and explain only real waiting dependencies.",
+      "Do not show the user giant coder prompts. Create or reference compact handoff files, pass them through handoff_files, and display only the high-level batch plan.",
+    ])
     .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
       "Do not skip the interface phase for large multi-agent implementation unless the task is clearly small, one coder can safely own the work, or the repo already has clean contracts that make the boundaries obvious.",
@@ -126,6 +139,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "One group call equals one logical bucket.",
       "Use multiple group calls in the same assistant message when independent groups can run concurrently.",
       "Put all independent calls for the same logical bucket inside one group call. Do not launch one coder, wait, then launch the next coder when both were already ready.",
+      "Treat the group calls array as the user's wait-time reducer: every ready sibling added now is one less avoidable subagent round trip.",
       "After a shared foundation or contract layer is established, immediately launch every non-conflicting dependent slice in one implementation group, such as services, CLI, UI, tests, docs, and adapters when their scopes are separated by handoff files.",
       "Before issuing an implementation group, do a readiness batching check: list every coder task that can proceed from existing contracts and handoff files, then include all of them in the same group call.",
       "Treat CLI, tests, examples, docs, adapters, and UI as parallel-ready when contracts define inputs, outputs, errors, and public behavior. They do not need to wait for engine code merely to start.",
