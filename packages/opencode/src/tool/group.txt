@@ -29,6 +29,7 @@ Usage notes:
 24. Do not run engine first, then CLI, then tests when CLI and tests can code against the same handoff files. Put engine, CLI, tests, docs, adapters, or UI together when ownership boundaries are clear.
 25. Use descriptive group.name and calls[].name values because users see those labels while work is running.
 26. Keep the user experience smooth: point coder tasks at handoff_files, keep prompts short, and avoid making the user wait through avoidable serial batches.
+27. Group summaries distinguish completed, failed, aborted, and blocked calls. Treat aborted as cancelled work, not as a normal task failure.
 
 Example input:
 

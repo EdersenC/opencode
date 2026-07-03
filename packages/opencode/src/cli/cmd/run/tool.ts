@@ -380,17 +380,30 @@ function runGroup(p: ToolProps<typeof GroupTool>): ToolInline {
   const group = dict(p.metadata.group)
   const state = text(group.state) || p.frame.status
   const failed = num(group.failedCount) ?? 0
+  const aborted = num(group.abortedCount) ?? 0
+  const blocked = num(group.blockedCount) ?? 0
   const total = num(group.callCount) ?? list<unknown>(p.input.calls).length
   const icon =
     state === "failed" || state === "aborted" || p.frame.status === "error"
       ? "✗"
-      : failed > 0
+      : failed + aborted > 0
         ? "!"
+        : blocked > 0
+          ? "?"
         : state === "running"
           ? "•"
           : "✓"
   const description =
-    total > 0 ? `${total} call${total === 1 ? "" : "s"}${failed > 0 ? ` · ${failed} failed` : ""}` : undefined
+    total > 0
+      ? [
+          `${total} call${total === 1 ? "" : "s"}`,
+          failed > 0 ? `${failed} failed` : "",
+          aborted > 0 ? `${aborted} aborted` : "",
+          blocked > 0 ? `${blocked} blocked` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : undefined
   return {
     icon,
     title: `Group: ${p.input.name || text(group.name) || "task group"}`,
@@ -825,10 +838,19 @@ function scrollGroupFinal(p: ToolProps<typeof GroupTool>): string {
   const name = p.input.name || text(group.name) || "task group"
   const completed = num(group.completedCount) ?? 0
   const failed = num(group.failedCount) ?? 0
+  const aborted = num(group.abortedCount) ?? 0
+  const blocked = num(group.blockedCount) ?? 0
   const total = num(group.callCount) ?? list<unknown>(p.input.calls).length
   return [
     `# Group: ${name}`,
-    `Completed ${completed} of ${total} calls. Failed ${failed} of ${total} calls.`,
+    [
+      `Completed ${completed} of ${total} calls.`,
+      `Failed ${failed} of ${total} calls.`,
+      aborted > 0 ? `Aborted ${aborted} of ${total} calls.` : "",
+      blocked > 0 ? `Blocked ${blocked} of ${total} calls.` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
   ].join("\n")
 }
 

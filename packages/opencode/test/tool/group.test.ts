@@ -210,6 +210,7 @@ describe("tool.group", () => {
       expect(def.description).toContain("A single nested task is not parallel")
       expect(def.description).toContain("Do not run engine first, then CLI, then tests")
       expect(def.description).toContain("Use descriptive group.name and calls[].name values")
+      expect(def.description).toContain("distinguish completed, failed, aborted, and blocked calls")
     }),
   )
 
@@ -480,8 +481,13 @@ describe("tool.group", () => {
       expect(yield* Effect.promise(() => cancelled.promise)).toBe(promptInput.sessionID)
       const result = yield* Fiber.join(fiber)
       expect(result.metadata.group.state).toBe("aborted")
+      expect(result.metadata.group.failedCount).toBe(0)
+      expect(result.metadata.group.abortedCount).toBe(1)
       expect(result.metadata.calls[0].state).toBe("aborted")
       expect(result.output).toContain(`state="aborted"`)
+      expect(result.output).toContain("Failed 0 of 1 calls.")
+      expect(result.output).toContain("Aborted 1 of 1 calls.")
+      expect(result.output).toContain("<call_aborted>")
     }),
   )
 

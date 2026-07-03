@@ -97,8 +97,8 @@ function blockedOutput(output?: string) {
 }
 
 function callContent(call: CallResult) {
-  if (call.state === "failed" || call.state === "aborted")
-    return ["<call_error>", call.error ?? "Task failed", "</call_error>"]
+  if (call.state === "failed") return ["<call_error>", call.error ?? "Task failed", "</call_error>"]
+  if (call.state === "aborted") return ["<call_aborted>", call.error ?? "Task aborted", "</call_aborted>"]
   if (call.state === "blocked") return ["<call_blocked>", call.output ?? "", "</call_blocked>"]
   return ["<call_result>", call.output ?? "", "</call_result>"]
 }
@@ -110,6 +110,7 @@ function renderOutput(input: {
   state: GroupState
   completedCount: number
   failedCount: number
+  abortedCount: number
   blockedCount: number
   calls: readonly CallResult[]
 }) {
@@ -122,6 +123,7 @@ function renderOutput(input: {
     [
       `Completed ${input.completedCount} of ${input.calls.length} calls.`,
       `Failed ${input.failedCount} of ${input.calls.length} calls.`,
+      `Aborted ${input.abortedCount} of ${input.calls.length} calls.`,
       `Blocked ${input.blockedCount} of ${input.calls.length} calls.`,
     ].join(" "),
     "</group_summary>",
@@ -146,9 +148,11 @@ function stateFor(calls: readonly CallResult[], parentAborted: boolean) {
   if (parentAborted || calls.every((call) => call.state === "aborted")) return "aborted" as const
   const completedCount = calls.filter((call) => call.state === "completed").length
   const blockedCount = calls.filter((call) => call.state === "blocked").length
-  const failedCount = calls.filter((call) => call.state === "failed" || call.state === "aborted").length
+  const failedCount = calls.filter((call) => call.state === "failed").length
+  const abortedCount = calls.filter((call) => call.state === "aborted").length
   if (completedCount === calls.length) return "completed" as const
-  if (failedCount > 0) return completedCount === 0 && blockedCount === 0 ? ("failed" as const) : ("completed_with_errors" as const)
+  if (failedCount + abortedCount > 0)
+    return completedCount === 0 && blockedCount === 0 ? ("failed" as const) : ("completed_with_errors" as const)
   if (blockedCount === calls.length) return "blocked" as const
   if (blockedCount > 0) return "completed_with_blockers" as const
   return "completed_with_errors" as const
@@ -197,6 +201,7 @@ export const GroupTool = Tool.define(
                 callCount: params.calls.length,
                 completedCount: 0,
                 failedCount: 0,
+                abortedCount: 0,
                 blockedCount: 0,
                 startedAt,
                 completedAt: startedAt,
@@ -286,7 +291,8 @@ export const GroupTool = Tool.define(
 
           const completedAt = Date.now()
           const completedCount = calls.filter((call) => call.state === "completed").length
-          const failedCount = calls.filter((call) => call.state === "failed" || call.state === "aborted").length
+          const failedCount = calls.filter((call) => call.state === "failed").length
+          const abortedCount = calls.filter((call) => call.state === "aborted").length
           const blockedCount = calls.filter((call) => call.state === "blocked").length
           const state = stateFor(calls, ctx.abort.aborted)
           const metadata = {
@@ -298,6 +304,7 @@ export const GroupTool = Tool.define(
               callCount: calls.length,
               completedCount,
               failedCount,
+              abortedCount,
               blockedCount,
               startedAt,
               completedAt,
@@ -326,6 +333,7 @@ export const GroupTool = Tool.define(
               state,
               completedCount,
               failedCount,
+              abortedCount,
               blockedCount,
               calls,
             }),
