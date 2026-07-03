@@ -1294,6 +1294,9 @@ export function Prompt(props: PromptProps) {
     const current = local.model.variant.current()
     return !!current
   })
+  const permissionMode = createMemo(() =>
+    local.permission.active((sync.data.config as { permission_mode?: string }).permission_mode),
+  )
 
   const agentMetaAlpha = createFadeIn(() => !!local.agent.current(), animationsEnabled)
   const modelMetaAlpha = createFadeIn(() => !!local.agent.current() && store.mode === "normal", animationsEnabled)
@@ -1442,14 +1445,10 @@ export function Prompt(props: PromptProps) {
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
                         {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
                       </text>
-                      <Show
-                        when={
-                          store.mode === "normal" &&
-                          (local.permission.mode === "auto" ||
-                            (sync.data.config as { permission_mode?: string }).permission_mode === "auto")
-                        }
-                      >
-                        <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>auto</text>
+                      <Show when={store.mode === "normal"}>
+                        <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>
+                          {permissionMode() === "auto" ? "auto" : "approve"}
+                        </text>
                       </Show>
                       <Show when={store.mode === "normal"}>
                         <box flexDirection="row" gap={1}>

@@ -207,8 +207,7 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          const auto =
-            permission.mode === "auto" || (store.config as { permission_mode?: string }).permission_mode === "auto"
+          const auto = permission.active((store.config as { permission_mode?: string }).permission_mode) === "auto"
           const decision = autoPermissionDecision(request)
           if (auto && (decision === "allow" || decision === "deny")) {
             void sdk.client.permission.reply({
