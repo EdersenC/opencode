@@ -12,6 +12,7 @@ Usage notes:
 7. Inner task calls run concurrently. Do not duplicate that work yourself.
 8. Inner background tasks are not supported because group waits for foreground completion.
 9. fail_fast is accepted for forward compatibility, but v1 returns all settled nested results because stopping sibling task calls early without changing task/session cleanup could lose result and cancellation accounting.
+10. If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. The caller should answer or ask the user, then redispatch only the affected task.
 
 Example input:
 

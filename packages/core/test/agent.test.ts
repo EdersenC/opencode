@@ -135,6 +135,10 @@ describe("AgentV2", () => {
       expect(orchestrate?.system).toContain("interface skill")
       expect(orchestrate?.system).toContain("before coder dispatch")
       expect(orchestrate?.system).toContain("multiple coder agents")
+      expect(orchestrate?.system).toContain('<coder_result state="blocked">')
+      expect(orchestrate?.system).toContain("<questions_for_orchestrator>")
+      expect(orchestrate?.system).toContain("redispatch only affected coder tasks")
+      expect(orchestrate?.system).toContain("boundary-based")
       expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "*", effect: "deny" })
       expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "interface", effect: "allow" })
 
@@ -142,6 +146,10 @@ describe("AgentV2", () => {
       expect(coder?.mode).toBe("subagent")
       expect(coder?.system).toContain("Treat interface contracts as the source of truth")
       expect(coder?.system).toContain("Do not change shared contracts unless explicitly told")
+      expect(coder?.system).toContain('<coder_result state="blocked">')
+      expect(coder?.system).toContain("<questions_for_orchestrator>")
+      expect(coder?.system).toContain("recommended options")
+      expect(coder?.system).toContain("safe default")
 
       const planner = yield* agent.get(AgentV2.ID.make("planner"))
       expect(planner?.mode).toBe("subagent")

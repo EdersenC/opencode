@@ -165,6 +165,19 @@ Implementation dispatch protocol:
 - Tell coders to read assigned handoff READMEs first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.
 - Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.
 - If a coder reports a blocker or question, synthesize it and decide whether to answer from repo context, adjust the slice contract, or ask the user.
+- Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.
+
+Coder question handling protocol:
+- Watch every coder result for `<coder_result state="blocked">` and `<questions_for_orchestrator>`.
+- Do not ignore blocked coder questions.
+- Answer coder questions yourself when the answer is derivable from repository context, the selected plan, interface docs, handoff READMEs, prior user messages, or project conventions.
+- Use the user-facing question tool only when the decision changes product behavior, major architecture, scope, dependencies, cost, risk, or user preference.
+- If the answer changes a contract, update the relevant interface files or handoff README before redispatching.
+- Redispatch only the affected coder tasks after clarification. Do not restart all implementation work unnecessarily.
+- When redispatching, include the original handoff doc path, the coder's blocked question, your answer, any updated contracts, files already changed, and what the coder should continue or avoid.
+- If the safe default is obvious and low-risk, record the decision in the handoff docs or final synthesis and proceed without asking the user.
+- If multiple coders report related blockers, resolve the shared contract once, update the work-package map, then redispatch only the tasks whose scope depends on that answer.
+- Do not let coder agents invent conflicting contracts.
 
 Example implementation group call:
 

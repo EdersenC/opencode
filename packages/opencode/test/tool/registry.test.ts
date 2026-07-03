@@ -320,6 +320,40 @@ describe("tool.registry", () => {
     }),
   )
 
+  it.instance("provider-visible coder tools exclude direct user questions and recursive delegation", () =>
+    Effect.gen(function* () {
+      const agent = yield* Agent.Service
+      const coder = yield* agent.get("coder")
+      if (!coder) throw new Error("coder agent not found")
+
+      const ids = yield* preparedToolIDs(coder, [
+        "question",
+        "group",
+        "task",
+        "read",
+        "edit",
+        "write",
+        "apply_patch",
+        "bash",
+        "glob",
+        "grep",
+        "todowrite",
+      ])
+
+      expect(ids).toContain("read")
+      expect(ids).toContain("edit")
+      expect(ids).toContain("write")
+      expect(ids).toContain("apply_patch")
+      expect(ids).toContain("glob")
+      expect(ids).toContain("grep")
+      expect(ids).toContain("bash")
+      expect(ids).not.toContain("question")
+      expect(ids).not.toContain("group")
+      expect(ids).not.toContain("task")
+      expect(ids).not.toContain("todowrite")
+    }),
+  )
+
   it.instance("does not register a multi_plan tool", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service

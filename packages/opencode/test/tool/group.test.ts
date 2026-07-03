@@ -330,6 +330,61 @@ describe("tool.group", () => {
     }),
   )
 
+  it.instance("preserves blocked coder results in metadata and output", () =>
+    Effect.gen(function* () {
+      const seedResult = yield* seed()
+      const blocked = [
+        '<coder_result state="blocked">',
+        "<summary>Implementation is blocked by one or more questions.</summary>",
+        "<questions_for_orchestrator>",
+        '<question priority="high" type="contract">Which DTO owns this field?</question>',
+        "</questions_for_orchestrator>",
+        "<recommended_options><option id=\"A\">Keep it in core.</option></recommended_options>",
+        "<safe_default>Keep the field out of the public contract.</safe_default>",
+        "</coder_result>",
+      ].join("\n")
+      const promptOps: TaskPromptOps = {
+        cancel: () => Effect.void,
+        resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+        prompt: (promptInput) =>
+          Effect.succeed(reply(promptInput, promptInput.agent === "coder" ? blocked : "nested succeeded")),
+      }
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+      const result = yield* def.execute(
+        input({
+          calls: [
+            {
+              tool: "task",
+              name: "blocked-coder",
+              description: "Blocked coder task",
+              input: { description: "Blocked coder", prompt: "blocked", subagent_type: "coder" },
+            },
+            {
+              tool: "task",
+              name: "success",
+              description: "Successful task",
+              input: { description: "Success task", prompt: "succeed", subagent_type: "general" },
+            },
+          ],
+        }),
+        context(seedResult, promptOps),
+      )
+
+      expect(result.metadata.group.state).toBe("completed_with_blockers")
+      expect(result.metadata.group.completedCount).toBe(1)
+      expect(result.metadata.group.failedCount).toBe(0)
+      expect(result.metadata.group.blockedCount).toBe(1)
+      expect(result.metadata.calls[0]).toMatchObject({ state: "blocked", blocked: true })
+      expect(result.metadata.calls[1]).toMatchObject({ state: "completed" })
+      expect(result.output).toContain('state="completed_with_blockers"')
+      expect(result.output).toContain('name="blocked-coder" title="1. blocked-coder" state="blocked"')
+      expect(result.output).toContain("<call_blocked>")
+      expect(result.output).toContain('<question priority="high" type="contract">')
+      expect(result.output).toContain("Blocked 1 of 2 calls.")
+    }),
+  )
+
   it.instance("cancels nested task calls when the parent abort signal fires", () =>
     Effect.gen(function* () {
       const seedResult = yield* seed()

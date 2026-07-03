@@ -42,13 +42,15 @@ type CallResult = {
   tool: "task"
   name: string
   description: string
-  state: "completed" | "failed" | "aborted"
+  state: "completed" | "failed" | "aborted" | "blocked"
   title?: string
   metadata?: unknown
   output?: string
   error?: string
   durationMs: number
 }
+
+type GroupState = "completed" | "completed_with_errors" | "failed" | "aborted" | "blocked" | "completed_with_blockers"
 
 function validate(params: Params) {
   for (const [index, call] of params.calls.entries()) {
@@ -75,13 +77,30 @@ function escapeAttr(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
 }
 
+function blockedOutput(output?: string) {
+  if (!output) return false
+  // TODO: Replace this structured-output convention with live parent-mediated
+  // subagent question bridging after child sessions can safely suspend and
+  // resume without violating provider tool-call/result matching.
+  if (/<coder_result\b[^>]*\bstate\s*=\s*["']blocked["'][^>]*>/i.test(output)) return true
+  return /<coder_result\b/i.test(output) && /<questions_for_orchestrator\b/i.test(output)
+}
+
+function callContent(call: CallResult) {
+  if (call.state === "failed" || call.state === "aborted")
+    return ["<call_error>", call.error ?? "Task failed", "</call_error>"]
+  if (call.state === "blocked") return ["<call_blocked>", call.output ?? "", "</call_blocked>"]
+  return ["<call_result>", call.output ?? "", "</call_result>"]
+}
+
 function renderOutput(input: {
   name: string
   description: string
   priority: string
-  state: "completed" | "completed_with_errors" | "failed" | "aborted"
+  state: GroupState
   completedCount: number
   failedCount: number
+  blockedCount: number
   calls: readonly CallResult[]
 }) {
   return [
@@ -93,6 +112,7 @@ function renderOutput(input: {
     [
       `Completed ${input.completedCount} of ${input.calls.length} calls.`,
       `Failed ${input.failedCount} of ${input.calls.length} calls.`,
+      `Blocked ${input.blockedCount} of ${input.calls.length} calls.`,
     ].join(" "),
     "</group_summary>",
     "<group_results>",
@@ -104,9 +124,7 @@ function renderOutput(input: {
       "<call_description>",
       call.description,
       "</call_description>",
-      call.state === "completed" ? "<call_result>" : "<call_error>",
-      call.state === "completed" ? (call.output ?? "") : (call.error ?? "Task failed"),
-      call.state === "completed" ? "</call_result>" : "</call_error>",
+      ...callContent(call),
       "</call>",
     ]),
     "</group_results>",
@@ -117,8 +135,12 @@ function renderOutput(input: {
 function stateFor(calls: readonly CallResult[], parentAborted: boolean) {
   if (parentAborted || calls.every((call) => call.state === "aborted")) return "aborted" as const
   const completedCount = calls.filter((call) => call.state === "completed").length
+  const blockedCount = calls.filter((call) => call.state === "blocked").length
+  const failedCount = calls.filter((call) => call.state === "failed" || call.state === "aborted").length
   if (completedCount === calls.length) return "completed" as const
-  if (completedCount === 0) return "failed" as const
+  if (failedCount > 0) return completedCount === 0 && blockedCount === 0 ? ("failed" as const) : ("completed_with_errors" as const)
+  if (blockedCount === calls.length) return "blocked" as const
+  if (blockedCount > 0) return "completed_with_blockers" as const
   return "completed_with_errors" as const
 }
 
@@ -165,6 +187,7 @@ export const GroupTool = Tool.define(
                 callCount: params.calls.length,
                 completedCount: 0,
                 failedCount: 0,
+                blockedCount: 0,
                 startedAt,
                 completedAt: startedAt,
                 durationMs: 0,
@@ -211,6 +234,7 @@ export const GroupTool = Tool.define(
                   .pipe(Effect.exit)
                 const durationMs = Date.now() - callStarted
                 if (Exit.isSuccess(exit)) {
+                  const blocked = blockedOutput(exit.value.output)
                   if (ctx.abort.aborted) {
                     return {
                       index,
@@ -228,7 +252,7 @@ export const GroupTool = Tool.define(
                     tool: "task" as const,
                     name: call.name,
                     description: call.description,
-                    state: "completed" as const,
+                    state: blocked ? ("blocked" as const) : ("completed" as const),
                     title,
                     metadata: exit.value.metadata,
                     output: exit.value.output,
@@ -251,7 +275,8 @@ export const GroupTool = Tool.define(
 
           const completedAt = Date.now()
           const completedCount = calls.filter((call) => call.state === "completed").length
-          const failedCount = calls.length - completedCount
+          const failedCount = calls.filter((call) => call.state === "failed" || call.state === "aborted").length
+          const blockedCount = calls.filter((call) => call.state === "blocked").length
           const state = stateFor(calls, ctx.abort.aborted)
           const metadata = {
             group: {
@@ -262,6 +287,7 @@ export const GroupTool = Tool.define(
               callCount: calls.length,
               completedCount,
               failedCount,
+              blockedCount,
               startedAt,
               completedAt,
               durationMs: completedAt - startedAt,
@@ -272,6 +298,7 @@ export const GroupTool = Tool.define(
               name: call.name,
               description: call.description,
               state: call.state,
+              ...(call.state === "blocked" ? { blocked: true } : {}),
               ...(call.title ? { title: call.title } : {}),
               ...(call.metadata !== undefined ? { metadata: call.metadata } : {}),
               durationMs: call.durationMs,
@@ -288,6 +315,7 @@ export const GroupTool = Tool.define(
               state,
               completedCount,
               failedCount,
+              blockedCount,
               calls,
             }),
           }
