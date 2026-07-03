@@ -28,6 +28,9 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("subagent_type\": \"coder")
     expect(lower).toContain("handoff_files")
     expect(lower).toContain("do not paste large handoff docs")
+    expect(lower).toContain("readiness batching check")
+    expect(lower).toContain("do not make the user watch avoidable serial phases")
+    expect(lower).toContain("contract-ready task should not wait for sibling code")
   })
 
   test("planner prompt compiles from builder segments", () => {
@@ -53,6 +56,8 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("scoped work package")
     expect(lower).toContain("handoff_files")
     expect(lower).toContain("read it first")
+    expect(lower).toContain("sibling implementation code is not present yet")
+    expect(lower).toContain("implement against the contract")
     expect(lower).toContain("well-structured technical narrative")
     expect(lower).toContain("each abstraction should have a reason")
     expect(lower).toContain("do not add noisy comments that restate obvious code")

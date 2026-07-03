@@ -82,6 +82,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Tight coupling is a reason to sequence coder work or assign one larger coherent slice, not a reason to abandon coder dispatch for medium or large coding work.",
       "Maximize the amount of safe parallel work per group. After contracts exist, ask which coder tasks can start now and put all ready non-conflicting tasks in the same group call.",
       "Prefer dependency-layer batching: one grouped foundation layer if truly needed, then one grouped implementation layer with all ready coders, then one grouped review and verification layer.",
+      "Do not make the user watch avoidable serial phases. If engine, CLI, tests, docs, adapters, or UI can all code against the same contracts, dispatch them together.",
     ])
     .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
@@ -100,6 +101,8 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
 - work-package map path
 - coder dispatch prompts
 - handoff_files arrays for each coder task
+- ready-now coder batch
+- blocked-by-dependency coder batch
 - parallel groups and sequential dependencies
 - shared files to avoid changing without orchestrator approval`,
     })
@@ -109,7 +112,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use multiple group calls in the same assistant message when independent groups can run concurrently.",
       "Put all independent calls for the same logical bucket inside one group call. Do not launch one coder, wait, then launch the next coder when both were already ready.",
       "After a shared foundation or contract layer is established, immediately launch every non-conflicting dependent slice in one implementation group, such as services, CLI, UI, tests, docs, and adapters when their scopes are separated by handoff files.",
+      "Before issuing an implementation group, do a readiness batching check: list every coder task that can proceed from existing contracts and handoff files, then include all of them in the same group call.",
       "Only serialize coder work when a later slice genuinely needs concrete output from an earlier slice and a written contract, stub, or handoff file is not enough to let it proceed safely.",
+      "A contract-ready task should not wait for sibling code merely because the sibling happens to be lower in the dependency graph; it should code to the contract and report integration assumptions.",
       "Useful group names include environment-discovery, multi-plan-generation, implementation-slices, review-and-verification, migration, docs, and cleanup.",
       "Use priority intentionally: high for planning blockers, implementation-critical work, and failing tests; medium for normal implementation and review; low for docs, cleanup, and nice-to-have analysis.",
     ])
@@ -128,6 +133,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Prefer one coder per coherent ownership boundary.",
       "Do not create overlapping edit scopes unless unavoidable.",
       "Use group to run independent coder tasks concurrently.",
+      "Maximize the amount of safe parallel work per group. Before issuing a group, ask: Which coder tasks can start now from the contracts and handoff files? Put all of those tasks in the same group call.",
       "Avoid drip-feeding implementation: do not wait for engine to finish before starting CLI, tests, docs, or adapters if the interface docs already define how those pieces connect.",
       "A good post-foundation group might include coder tasks for engine-services, cli-interface, test-coverage, and docs-or-examples at the same time, each with separate files and the same handoff_files.",
       "A bad pattern is: dispatch foundation, wait; dispatch engine, wait; dispatch CLI, wait; dispatch tests, wait. Use that pattern only when each step has a real unresolved dependency on the previous step's concrete code.",
@@ -137,6 +143,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use the task input handoff_files array for every relevant handoff README, interface contract, work-package map, and context file. This is the preferred way to point coders at docs you created.",
       "Do not rely only on an interface or handoff README path inside the prose prompt; put that path in handoff_files.",
       "Do not paste large handoff docs, contracts, or work-package maps into coder prompts. Put those files in handoff_files and keep prompt concise.",
+      "Keep coder prompts small enough to scan: point to handoff_files, state the slice goal, owned files, avoided files, contract files, verification, and return format.",
       "Tell coders to read assigned handoff_files first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.",
       "Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.",
       "Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.",

@@ -31,6 +31,7 @@ Create contract-first interfaces and handoff documents before dispatching coder 
 6. Create a work-package map.
 7. Decide which coder tasks can run in parallel and which must run sequentially.
 8. Produce coder dispatch prompts.
+9. Mark the ready-now coder batch separately from tasks that are blocked by unresolved dependencies.
 
 ## Interface Contracts
 
@@ -84,6 +85,8 @@ Avoid overlapping edit scopes. If overlap is unavoidable, make one task own the 
 
 Run coder tasks in parallel only when their owned files and contracts are clear, their dependencies already exist, and they can complete without editing the same files.
 
+If a task can proceed from written contracts, interface files, fixtures, stubs, or handoff docs, treat it as ready for the next parallel group even if sibling implementation code is not finished yet.
+
 Run coder tasks sequentially when:
 
 - One slice creates shared interfaces, schemas, migrations, or generated code another slice depends on.
@@ -93,6 +96,8 @@ Run coder tasks sequentially when:
 - The blast radius is high enough that review should happen between phases.
 
 When unsure, create contracts first, dispatch independent implementation slices second, then run a grouped review and verification pass.
+
+Avoid drip-feeding coders. After the foundation or contract layer exists, launch all ready sibling work packages in one implementation group instead of waiting for engine, CLI, tests, docs, adapters, or UI one at a time.
 
 ## Coder Dispatch Prompts
 
@@ -165,6 +170,8 @@ List known unknowns and when to escalate to orchestrator.
 - Depends on:
 - Can run in parallel with:
 - Must run after:
+- Ready now:
+- Blocked by:
 - Review focus:
 ```
 
@@ -176,6 +183,8 @@ Prepare a concise interface-phase summary for the orchestrator:
 - Handoff README files created or updated.
 - Work-package map path.
 - Coder task prompts ready to dispatch.
+- Ready-now coder batch for the next group call.
+- Blocked-by-dependency coder batch with exact unblock conditions.
 - Parallel groups and sequential dependencies.
 - Shared files that coders must not casually edit.
 - Remaining questions or risks before implementation.

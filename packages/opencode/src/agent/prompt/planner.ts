@@ -32,6 +32,7 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
       "Include recommended coder work packages when implementation is likely to span multiple files, modules, layers, or tests.",
       "If files are tightly coupled, recommend sequential coder phases such as shared contracts or types first, then dependent implementation, then tests and review.",
       "Name likely handoff boundaries and note when work should be parallel versus sequential.",
+      "Mark which implementation slices can run in the same group after contracts exist, and which slices truly require concrete earlier output.",
     ])
     .qualityBar([
       "The recommended architecture should be concrete enough for implementation.",

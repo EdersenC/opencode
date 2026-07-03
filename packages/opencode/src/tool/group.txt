@@ -17,6 +17,10 @@ Usage notes:
 12. Use group to fully leverage parallel work. If several coder tasks can start from the same contracts or handoff files, put them in the same group call instead of issuing one task, waiting, and then issuing the next.
 13. Use dependency-layer groups. Run a foundation or contract group only when needed, then run every ready implementation slice in one follow-up group, then run review and verification in another group.
 14. Serial task dispatch is only appropriate when a later task genuinely needs concrete output from an earlier task and written contracts are not enough to proceed safely.
+15. Before creating a group, identify every ready sibling task. A group can contain many nested task calls, and all of those inner task calls start concurrently.
+16. For coder groups, use the configured coder subagents/models to do the coding work. The caller should coordinate contracts, boundaries, review, and verification rather than manually implementing medium or large slices.
+17. If engine, CLI, tests, docs, adapters, or UI can all code against the same handoff files, dispatch them together in one implementation group.
+18. Keep nested coder prompts concise. Put large handoff documents in input.handoff_files and tell the coder which files to own, avoid, verify, and report on.
 
 Example input:
 

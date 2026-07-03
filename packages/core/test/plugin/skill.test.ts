@@ -24,6 +24,8 @@ describe("SkillPlugin.Plugin", () => {
       expect(list.find((item) => item.name === "interface")?.content).toContain("handoff README")
       expect(list.find((item) => item.name === "interface")?.content).toContain("work-package map")
       expect(list.find((item) => item.name === "interface")?.content).toContain("coder dispatch prompts")
+      expect(list.find((item) => item.name === "interface")?.content).toContain("ready-now coder batch")
+      expect(list.find((item) => item.name === "interface")?.content).toContain("Blocked by")
       expect(list.find((item) => item.name === "interface")?.content).toContain("Correctness Criteria")
       expect(list.find((item) => item.name === "interface")?.content).toContain("Review Focus")
     }),

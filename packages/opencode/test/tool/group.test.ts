@@ -195,6 +195,17 @@ describe("tool.group", () => {
     }),
   )
 
+  it.instance("description teaches full ready-batch parallel dispatch", () =>
+    Effect.gen(function* () {
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+
+      expect(def.description).toContain("all of those inner task calls start concurrently")
+      expect(def.description).toContain("dispatch them together in one implementation group")
+      expect(def.description).toContain("Keep nested coder prompts concise")
+    }),
+  )
+
   it.instance("rejects unsupported nested tools, recursive group calls, and nested background tasks", () =>
     Effect.gen(function* () {
       const seedResult = yield* seed()

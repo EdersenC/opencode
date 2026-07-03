@@ -7,7 +7,10 @@ const id = "group"
 
 const TaskInput = Schema.Struct({
   description: Schema.NonEmptyString.annotate({ description: "A short description of the nested task" }),
-  prompt: Schema.NonEmptyString.annotate({ description: "The task for the subagent to perform" }),
+  prompt: Schema.NonEmptyString.annotate({
+    description:
+      "Concise task instructions for the subagent. Use handoff_files for large contracts, READMEs, and context documents.",
+  }),
   subagent_type: Schema.NonEmptyString.annotate({ description: "The type of specialized agent to use for this task" }),
   handoff_files: Schema.optional(Schema.Array(Schema.NonEmptyString)).annotate({
     description:
@@ -33,7 +36,10 @@ export const Parameters = Schema.Struct({
   priority: Schema.Literals(["low", "medium", "high"])
     .annotate({ description: "Group priority. Defaults to medium.", default: "medium" })
     .pipe(Schema.withDecodingDefault(Effect.succeed("medium" as const))),
-  calls: Schema.NonEmptyArray(NestedCall).annotate({ description: "Nested task calls to execute concurrently" }),
+  calls: Schema.NonEmptyArray(NestedCall).annotate({
+    description:
+      "Nested task calls to execute concurrently. Include every ready sibling task in this one group instead of drip-feeding serial task calls.",
+  }),
   fail_fast: Schema.optional(Schema.Boolean).annotate({
     description: "Defaults to false. v1 still waits for all nested calls to settle.",
   }),
