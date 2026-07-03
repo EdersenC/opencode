@@ -62,6 +62,17 @@ type CallResult = {
 
 type GroupState = "completed" | "completed_with_errors" | "failed" | "aborted" | "blocked" | "completed_with_blockers"
 
+type RunningCall = {
+  index: number
+  tool: "task"
+  name: string
+  description: string
+  state: "running"
+  title?: string
+  metadata?: unknown
+  durationMs: number
+}
+
 function validate(params: Params) {
   for (const [index, call] of params.calls.entries()) {
     if (call.tool === "group") throw new Error(`group call ${index} is recursive; nested group calls are not supported`)
@@ -179,6 +190,40 @@ export const GroupTool = Tool.define(
 
           const startedAt = Date.now()
           const groupName = safeName(params.name)
+          const runningCalls: RunningCall[] = params.calls.map((call, index) => ({
+            index,
+            tool: "task",
+            name: call.name,
+            description: call.description,
+            state: "running",
+            durationMs: 0,
+          }))
+          const runningMetadata = () => ({
+            group: {
+              name: params.name,
+              description: params.description,
+              priority: params.priority,
+              state: "running",
+              callCount: params.calls.length,
+              completedCount: 0,
+              failedCount: 0,
+              abortedCount: 0,
+              blockedCount: 0,
+              startedAt,
+              completedAt: startedAt,
+              durationMs: Date.now() - startedAt,
+            },
+            calls: runningCalls.map((call) => ({
+              index: call.index,
+              tool: call.tool,
+              name: call.name,
+              description: call.description,
+              state: call.state,
+              ...(call.title ? { title: call.title } : {}),
+              ...(call.metadata !== undefined ? { metadata: call.metadata } : {}),
+              durationMs: call.durationMs,
+            })),
+          })
           yield* ctx.ask({
             permission: id,
             patterns: [params.name],
@@ -192,30 +237,7 @@ export const GroupTool = Tool.define(
           })
           yield* ctx.metadata({
             title: `Group: ${params.name}`,
-            metadata: {
-              group: {
-                name: params.name,
-                description: params.description,
-                priority: params.priority,
-                state: "running",
-                callCount: params.calls.length,
-                completedCount: 0,
-                failedCount: 0,
-                abortedCount: 0,
-                blockedCount: 0,
-                startedAt,
-                completedAt: startedAt,
-                durationMs: 0,
-              },
-              calls: params.calls.map((call, index) => ({
-                index,
-                tool: "task",
-                name: call.name,
-                description: call.description,
-                state: "running",
-                durationMs: 0,
-              })),
-            },
+            metadata: runningMetadata(),
           })
 
           // fail_fast is accepted for forward compatibility, but v1 keeps all-settled
@@ -241,9 +263,17 @@ export const GroupTool = Tool.define(
                       ...ctx,
                       callID: nestedCallID,
                       metadata: (value) =>
-                        ctx.metadata({
-                          title,
-                          metadata: value.metadata,
+                        Effect.gen(function* () {
+                          runningCalls[index] = {
+                            ...runningCalls[index],
+                            title,
+                            ...(value.metadata !== undefined ? { metadata: value.metadata } : {}),
+                            durationMs: Date.now() - callStarted,
+                          }
+                          yield* ctx.metadata({
+                            title: `Group: ${params.name}`,
+                            metadata: runningMetadata(),
+                          })
                         }),
                     },
                   )

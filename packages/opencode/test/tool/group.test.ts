@@ -293,6 +293,57 @@ describe("tool.group", () => {
     }),
   )
 
+  it.instance("keeps running group metadata when nested tasks publish child metadata", () =>
+    Effect.gen(function* () {
+      const seedResult = yield* seed()
+      const updates: Array<{ title?: string; metadata?: unknown }> = []
+      const promptOps: TaskPromptOps = {
+        cancel: () => Effect.void,
+        resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+        prompt: (promptInput) => Effect.succeed(reply(promptInput, "done")),
+      }
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+
+      yield* def.execute(input(), {
+        ...context(seedResult, promptOps),
+        metadata: (value) =>
+          Effect.sync(() => {
+            updates.push(value)
+          }),
+      })
+
+      expect(updates.length).toBeGreaterThanOrEqual(2)
+      expect(updates.every((update) => update.title === "Group: feature-implementation")).toBe(true)
+      expect(updates[0]?.metadata).toMatchObject({
+        group: {
+          name: "feature-implementation",
+          state: "running",
+          callCount: 1,
+        },
+        calls: [expect.objectContaining({ name: "one", state: "running" })],
+      })
+      expect(updates[1]?.metadata).toMatchObject({
+        group: {
+          name: "feature-implementation",
+          state: "running",
+          callCount: 1,
+        },
+        calls: [
+          expect.objectContaining({
+            name: "one",
+            state: "running",
+            title: "1. one",
+            metadata: expect.objectContaining({
+              sessionId: expect.any(String),
+              parentSessionId: seedResult.chat.id,
+            }),
+          }),
+        ],
+      })
+    }),
+  )
+
   it.instance("executes nested task calls concurrently and waits for all results", () =>
     Effect.gen(function* () {
       const seedResult = yield* seed()
