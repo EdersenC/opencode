@@ -18,6 +18,14 @@ The full-suite benchmark defaults to one measured run. Use repeated runs only af
 BENCH_WARMUPS=1 BENCH_RUNS=3 bun run bench:test
 ```
 
+To benchmark a focused smoke/e2e target, pass one or more comma-separated files:
+
+```sh
+BENCH_TEST_FILES='test/cli/run/run-process.test.ts' BENCH_RUNS=3 bun run bench:test
+```
+
+`test/cli/run/run-process.test.ts` includes the non-interactive CLI smoke tests for the DeepSeek V4 Flash Free mock model and the orchestrate agent.
+
 To identify slow files, run:
 
 ```sh
@@ -34,6 +42,8 @@ TEST_PROFILE_LIMIT=20 bun run profile:test
 ## Primary Metric
 
 `METRIC test_suite_seconds=<median wall clock seconds>`
+
+Focused benchmark mode emits `METRIC test_target_seconds=<median wall clock seconds>`.
 
 ## Secondary Metrics
 
