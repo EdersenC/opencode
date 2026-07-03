@@ -6,6 +6,7 @@ import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { canAutoApprove } from "./auto"
 
 export const Event = PermissionV1.Event
 
@@ -82,6 +83,14 @@ const layer = Layer.effect(
       }
 
       if (!needsAsk) return
+      if (canAutoApprove(request)) {
+        yield* Effect.logInfo("auto-approved", {
+          permission: request.permission,
+          patterns: request.patterns,
+          metadata: request.metadata,
+        })
+        return
+      }
 
       const id = request.id ?? PermissionV1.ID.ascending()
       const info: PermissionV1.Request = {

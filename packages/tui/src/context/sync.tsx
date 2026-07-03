@@ -51,6 +51,19 @@ function search<T>(items: T[], target: string, key: (item: T) => string) {
   return { found: false, index: left }
 }
 
+function safeAutoPermission(request: PermissionRequest) {
+  const approval = request.metadata?.autoApprove
+  return (
+    request.permission === "bash" &&
+    typeof approval === "object" &&
+    approval !== null &&
+    "kind" in approval &&
+    approval.kind === "project-local-shell" &&
+    "safe" in approval &&
+    approval.safe === true
+  )
+}
+
 export const {
   context: SyncContext,
   use: useSync,
@@ -189,7 +202,10 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (permission.mode === "auto") {
+          if (
+            (permission.mode === "auto" || (store.config as { permission_mode?: string }).permission_mode === "auto") &&
+            safeAutoPermission(request)
+          ) {
             void sdk.client.permission.reply({
               requestID: request.id,
               reply: "once",

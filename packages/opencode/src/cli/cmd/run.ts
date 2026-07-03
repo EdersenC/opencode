@@ -25,6 +25,7 @@ import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { canAutoApproveRequest, normalizeMode } from "@/permission/auto"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -241,8 +242,13 @@ export const RunCommand = effectCmd({
       })
       .option("auto", {
         type: "boolean",
-        describe: "auto-approve permissions that are not explicitly denied (dangerous!)",
+        describe: "auto-approve safe project-local bash permissions",
         default: false,
+      })
+      .option("permission-mode", {
+        type: "string",
+        choices: ["ask", "auto"],
+        describe: "permission mode to use for this run",
       })
       .option("yolo", {
         type: "boolean",
@@ -271,7 +277,10 @@ export const RunCommand = effectCmd({
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
-      const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
+      const permissionMode = normalizeMode(
+        args["permission-mode"] ?? (args.auto || args.yolo || args["dangerously-skip-permissions"] ? "auto" : "ask"),
+      )
+      const auto = permissionMode === "auto"
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
@@ -797,7 +806,7 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (permission.sessionID !== sessionID) continue
 
-              if (auto) {
+              if (auto && canAutoApproveRequest(permission)) {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",
@@ -891,6 +900,7 @@ export const RunCommand = effectCmd({
             createSession: createFreshSession,
             thinking,
             backgroundSubagents: flags.experimentalBackgroundSubagents,
+            autoPermission: auto,
             demo: args.demo,
           })
         } catch (error) {
@@ -928,6 +938,7 @@ export const RunCommand = effectCmd({
             initialInput,
             thinking,
             backgroundSubagents: flags.experimentalBackgroundSubagents,
+            autoPermission: auto,
             demo: args.demo,
           })
         } catch (error) {
@@ -971,6 +982,8 @@ type MiniCommandInput = {
   prompt?: string
   replay?: boolean
   replayLimit?: number
+  permissionMode?: "ask" | "auto"
+  auto?: boolean
   demo?: boolean
 }
 
@@ -1002,7 +1015,9 @@ export async function runMini(input: MiniCommandInput) {
     replay: input.replay ?? true,
     "replay-limit": input.replayLimit,
     replayLimit: input.replayLimit,
-    auto: false,
+    "permission-mode": input.permissionMode ?? (input.auto ? "auto" : "ask"),
+    permissionMode: input.permissionMode ?? (input.auto ? "auto" : "ask"),
+    auto: input.auto ?? false,
     yolo: false,
     "dangerously-skip-permissions": false,
     dangerouslySkipPermissions: false,

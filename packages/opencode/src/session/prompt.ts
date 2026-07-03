@@ -33,6 +33,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
+import { withMode } from "@/permission/auto"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -320,6 +321,7 @@ const layer = Layer.effect(
       }
 
       let error: Error | undefined
+      const cfg = yield* config.get()
       const taskAbort = new AbortController()
       const result = yield* taskTool
         .execute(taskArgs, {
@@ -343,6 +345,7 @@ const layer = Layer.effect(
               .ask({
                 ...req,
                 sessionID,
+                metadata: withMode(req.metadata, cfg.permission_mode),
                 ruleset: Permission.merge(taskAgent.permission, session.permission ?? []),
               })
               .pipe(Effect.orDie),
@@ -1235,6 +1238,7 @@ const layer = Layer.effect(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),
               Effect.provideService(ToolRegistry.Service, registry),
+              Effect.provideService(Config.Service, config),
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
             )

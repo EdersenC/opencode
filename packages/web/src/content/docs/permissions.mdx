@@ -21,19 +21,28 @@ Each permission rule resolves to one of:
 
 ## Auto mode
 
-Start OpenCode with `--auto` to automatically approve permission requests that are not explicitly denied.
+Start OpenCode with `--auto` to automatically approve safe project-local bash permission requests that are not explicitly denied.
 
 ```bash
 opencode --auto
 ```
 
-You can also use auto mode with [`opencode run`](/docs/cli#run).
+You can also use `--permission-mode auto`, including with [`opencode run`](/docs/cli#run).
 
 ```bash
-opencode run --auto "Refactor this module"
+opencode run --permission-mode auto "Refactor this module"
 ```
 
-Explicit `"deny"` rules are still enforced. Auto mode only changes requests that would otherwise ask for approval.
+Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask.
+
+You can make auto mode persistent in config:
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission_mode": "auto"
+}
+```
 
 In the TUI, open the command palette and select **Enable auto-approve permissions** or **Disable auto-approve permissions** to change modes. When auto mode is active, the prompt displays a muted `auto` indicator next to the current agent.
 

@@ -15,6 +15,7 @@
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { MessageID } from "@/session/schema"
+import { canAutoApproveRequest } from "@/permission/auto"
 import { createRunDemo } from "./demo"
 import { resolveModelInfo, resolveRunTuiConfig, resolveSessionInfo } from "./runtime.boot"
 import { createRuntimeLifecycle } from "./runtime.lifecycle"
@@ -52,6 +53,7 @@ type RunRuntimeInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   replay?: boolean
   replayLimit?: number
   demo?: RunInput["demo"]
@@ -71,6 +73,7 @@ type RunLocalInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   replay?: boolean
   replayLimit?: number
   demo?: RunInput["demo"]
@@ -483,6 +486,21 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         providers: () => state.providers,
         footer,
         trace: log,
+        onAutoPermission: input.autoPermission
+          ? (request) => {
+              if (!canAutoApproveRequest(request)) {
+                return false
+              }
+
+              void ctx.sdk.permission
+                .reply({
+                  requestID: request.id,
+                  reply: "once",
+                })
+                .catch(() => {})
+              return true
+            }
+          : undefined,
       })
       if (footer.isClosed) {
         await handle.close()
@@ -745,6 +763,7 @@ export async function runInteractiveLocalMode(input: RunLocalInput): Promise<voi
     initialInput: input.initialInput,
     thinking: input.thinking,
     backgroundSubagents: input.backgroundSubagents,
+    autoPermission: input.autoPermission,
     replay: input.replay,
     replayLimit: input.replayLimit,
     demo: input.demo,
@@ -794,6 +813,7 @@ export async function runInteractiveMode(
       initialInput: input.initialInput,
       thinking: input.thinking,
       backgroundSubagents: input.backgroundSubagents,
+      autoPermission: input.autoPermission,
       replay: input.replay,
       replayLimit: input.replayLimit,
       demo: input.demo,

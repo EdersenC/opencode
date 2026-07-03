@@ -15,7 +15,7 @@
 // The tick counter prevents stale idle events from resolving the wrong turn.
 // We also re-check live session status before resolving an idle event so a
 // delayed idle from an older turn cannot complete a newer busy turn.
-import type { Event, GlobalEvent, OpencodeClient } from "@opencode-ai/sdk/v2"
+import type { Event, GlobalEvent, OpencodeClient, PermissionRequest } from "@opencode-ai/sdk/v2"
 import { Context, Deferred, Effect, Exit, Layer, Scope, Stream } from "effect"
 import { makeRuntime } from "@/effect/run-service"
 import {
@@ -78,6 +78,7 @@ type StreamInput = {
   footer: FooterApi
   trace?: Trace
   signal?: AbortSignal
+  onAutoPermission?: (request: PermissionRequest) => boolean
 }
 
 type Wait = {
@@ -890,6 +891,15 @@ function createLayer(input: StreamInput) {
 
               replayedParts.delete(event.properties.partID)
             }
+          }
+
+          if (event.type === "permission.asked" && input.onAutoPermission?.(event.properties)) {
+            input.trace?.write("send.permission.auto", {
+              requestID: event.properties.id,
+              permission: event.properties.permission,
+              sessionID: event.properties.sessionID,
+            })
+            return
           }
 
           trackBlocker(event)

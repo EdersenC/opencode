@@ -716,6 +716,17 @@ For example, to ensure that the `edit` and `bash` tools require user approval:
 }
 ```
 
+To auto-approve safe project-local bash requests that would otherwise ask, set `permission_mode`:
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission_mode": "auto"
+}
+```
+
+Explicit deny rules still win, and unsafe or external commands still require approval.
+
 [Learn more about permissions here](/docs/permissions).
 
 ---

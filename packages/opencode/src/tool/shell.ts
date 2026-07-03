@@ -21,6 +21,7 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import { shellApproval } from "@/permission/auto"
 
 export { Parameters } from "./shell/prompt"
 
@@ -261,8 +262,8 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
 })
 
 const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan, input: { command: string }) {
+  const directories = Array.from(scan.dirs)
   if (scan.dirs.size > 0) {
-    const directories = Array.from(scan.dirs)
     const globs = directories.map((dir) => {
       if (process.platform === "win32") return FSUtil.normalizePathPattern(path.join(dir, "*"))
       return path.join(dir, "*")
@@ -280,12 +281,14 @@ const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan,
   }
 
   if (scan.patterns.size === 0) return
+  const patterns = Array.from(scan.patterns)
   yield* ctx.ask({
     permission: ShellID.ToolID,
-    patterns: Array.from(scan.patterns),
+    patterns,
     always: Array.from(scan.always),
     metadata: {
       command: input.command,
+      autoApprove: shellApproval({ patterns, externalDirectories: directories }),
     },
   })
 })

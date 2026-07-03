@@ -241,6 +241,53 @@ describe("tool.shell permissions", () => {
     }),
   )
 
+  each("marks project-local bash permission requests as safe for auto mode", () =>
+    Effect.gen(function* () {
+      const tmp = yield* tmpdirScoped()
+      yield* runIn(
+        tmp,
+        Effect.gen(function* () {
+          const requests: Array<Omit<PermissionV1.Request, "id" | "sessionID" | "tool">> = []
+          yield* run(
+            {
+              command: "npm test",
+            },
+            capture(requests),
+          )
+          const bashReq = requests.find((r) => r.permission === "bash")
+          expect(bashReq?.metadata.autoApprove).toMatchObject({
+            kind: "project-local-shell",
+            safe: true,
+          })
+        }),
+      )
+    }),
+  )
+
+  each("marks unsafe bash permission requests as not safe for auto mode", () =>
+    Effect.gen(function* () {
+      const tmp = yield* tmpdirScoped()
+      yield* runIn(
+        tmp,
+        Effect.gen(function* () {
+          const requests: Array<Omit<PermissionV1.Request, "id" | "sessionID" | "tool">> = []
+          yield* run(
+            {
+              command: "git push",
+            },
+            capture(requests),
+          )
+          const bashReq = requests.find((r) => r.permission === "bash")
+          expect(bashReq?.metadata.autoApprove).toMatchObject({
+            kind: "project-local-shell",
+            safe: false,
+            reason: "git push",
+          })
+        }),
+      )
+    }),
+  )
+
   each("asks for bash permission with multiple commands", () =>
     Effect.gen(function* () {
       const tmp = yield* tmpdirScoped()

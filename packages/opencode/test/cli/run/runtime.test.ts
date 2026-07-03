@@ -198,6 +198,7 @@ describe("run interactive runtime", () => {
         files: [],
         thinking: true,
         backgroundSubagents: false,
+        autoPermission: false,
       },
       {
         createRuntimeLifecycle: async () => ({

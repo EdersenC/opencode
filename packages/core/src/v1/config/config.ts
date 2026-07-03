@@ -65,6 +65,10 @@ export const Info = Schema.Struct({
     description:
       "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications",
   }),
+  permission_mode: Schema.optional(Schema.Literals(["ask", "auto"])).annotate({
+    description:
+      "Permission mode. 'ask' uses normal approval prompts. 'auto' automatically approves safe project-local bash commands while preserving explicit deny rules.",
+  }),
   disabled_providers: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Disable providers that are loaded automatically",
   }),

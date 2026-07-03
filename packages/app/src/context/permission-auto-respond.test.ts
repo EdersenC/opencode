@@ -9,10 +9,17 @@ const session = (input: { id: string; parentID?: string }) =>
     parentID: input.parentID,
   }) as Session
 
-const permission = (sessionID: string) =>
+const permission = (sessionID: string, safe = true) =>
   ({
     sessionID,
-  }) as Pick<PermissionRequest, "sessionID">
+    permission: "bash",
+    metadata: {
+      autoApprove: {
+        kind: "project-local-shell",
+        safe,
+      },
+    },
+  }) as Pick<PermissionRequest, "sessionID" | "permission" | "metadata">
 
 describe("autoRespondsPermission", () => {
   test("uses a parent session's directory-scoped auto-accept", () => {
@@ -80,6 +87,33 @@ describe("autoRespondsPermission", () => {
     }
 
     expect(autoRespondsPermission(autoAccept, sessions, permission("root"), directory)).toBe(false)
+  })
+
+  test("does not auto-respond to unsafe permission requests", () => {
+    const directory = "/tmp/project"
+    const sessions = [session({ id: "root" })]
+    const autoAccept = {
+      [`${base64Encode(directory)}/*`]: true,
+    }
+
+    expect(autoRespondsPermission(autoAccept, sessions, permission("root", false), directory)).toBe(false)
+    expect(
+      autoRespondsPermission(
+        autoAccept,
+        sessions,
+        {
+          sessionID: "root",
+          permission: "edit",
+          metadata: {
+            autoApprove: {
+              kind: "project-local-shell",
+              safe: true,
+            },
+          },
+        },
+        directory,
+      ),
+    ).toBe(false)
   })
 })
 

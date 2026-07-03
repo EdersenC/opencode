@@ -5,6 +5,7 @@ import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Permission } from "../../src/permission"
+import { shellApproval } from "../../src/permission/auto"
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { TestInstance, tmpdirScoped } from "../fixture/fixture"
@@ -553,6 +554,18 @@ test("disabled - specific allow overrides wildcard deny", () => {
   expect(result.has("read")).toBe(true)
 })
 
+test("auto policy marks only project-local shell requests as safe", () => {
+  expect(shellApproval({ patterns: ["npm test"], externalDirectories: [] })).toMatchObject({ safe: true })
+  expect(shellApproval({ patterns: ["git push"], externalDirectories: [] })).toMatchObject({
+    safe: false,
+    reason: "git push",
+  })
+  expect(shellApproval({ patterns: ["npm test"], externalDirectories: ["/etc"] })).toMatchObject({
+    safe: false,
+    reason: "external directory",
+  })
+})
+
 // ask tests
 
 it.instance(
@@ -587,6 +600,73 @@ it.instance(
         }),
       )
       expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - auto mode resolves safe project-local shell requests",
+  () =>
+    Effect.gen(function* () {
+      const result = yield* ask({
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["npm test"],
+        metadata: {
+          permissionMode: "auto",
+          autoApprove: shellApproval({ patterns: ["npm test"], externalDirectories: [] }),
+        },
+        always: ["npm *"],
+        ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+      })
+      expect(result).toBeUndefined()
+      expect(yield* list()).toHaveLength(0)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - auto mode does not resolve unsafe shell requests",
+  () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        sessionID: SessionID.make("session_test"),
+        permission: "bash",
+        patterns: ["git push"],
+        metadata: {
+          permissionMode: "auto",
+          autoApprove: shellApproval({ patterns: ["git push"], externalDirectories: [] }),
+        },
+        always: ["git *"],
+        ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+      }).pipe(Effect.forkScoped)
+
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* rejectAll()
+      yield* Fiber.await(fiber)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - explicit deny wins over auto mode",
+  () =>
+    Effect.gen(function* () {
+      const err = yield* fail(
+        ask({
+          sessionID: SessionID.make("session_test"),
+          permission: "bash",
+          patterns: ["npm test"],
+          metadata: {
+            permissionMode: "auto",
+            autoApprove: shellApproval({ patterns: ["npm test"], externalDirectories: [] }),
+          },
+          always: ["npm *"],
+          ruleset: [{ permission: "bash", pattern: "*", action: "deny" }],
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(yield* list()).toHaveLength(0)
     }),
   { git: true },
 )

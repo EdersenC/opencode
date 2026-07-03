@@ -69,6 +69,7 @@ export type RunInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   demo?: boolean
 }
 
