@@ -43,6 +43,12 @@ function groupCommit(metadata: Record<string, unknown>): StreamCommit {
 }
 
 describe("run tool display rules", () => {
+  test("group start output shows batch size", () => {
+    expect(toolScroll("start", toolFrame(groupCommit({}), ""))).toBe(
+      ["# Group: implementation-slices", "Starting 4 calls."].join("\n"),
+    )
+  })
+
   test("group summaries distinguish failed, aborted, and blocked calls", () => {
     const metadata = {
       name: "implementation-slices",

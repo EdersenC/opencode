@@ -826,7 +826,13 @@ function scrollTaskFinal(p: ToolProps<typeof TaskTool>): string {
 }
 
 function scrollGroupStart(p: ToolProps<typeof GroupTool>): string {
-  return `# Group: ${p.input.name || "task group"}`
+  const total = list<unknown>(p.input.calls).length
+  return [
+    `# Group: ${p.input.name || "task group"}`,
+    total > 0 ? `Starting ${total} call${total === 1 ? "" : "s"}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
 }
 
 function scrollGroupFinal(p: ToolProps<typeof GroupTool>): string {
