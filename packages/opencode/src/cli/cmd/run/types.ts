@@ -86,7 +86,6 @@ export type FooterState = {
   status: string
   queue: number
   model: string
-  duration: string
   timing: string
   usage: string
   first: boolean

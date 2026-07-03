@@ -5,7 +5,8 @@
 // an active ordinary turn are exposed for edit/removal until they begin.
 //
 // The queue also handles /exit, /quit, and /new commands, empty-prompt rejection,
-// and tracks per-turn wall-clock duration for the footer status line.
+// and tracks per-turn wall-clock duration for scrollback summaries plus
+// cumulative session timing for the footer status line.
 //
 // Resolves when the footer closes and all in-flight work finishes.
 import * as Locale from "@/util/locale"
@@ -100,9 +101,9 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
   const formatTiming = () => {
     const snapshot = timingSnapshot()
     return [
-      `session ${Locale.duration(snapshot.totalMs)}`,
+      `total ${Locale.duration(snapshot.totalMs)}`,
       `work ${Locale.duration(snapshot.workingMs)}`,
-      `between ${Locale.duration(snapshot.betweenMs)}`,
+      `idle ${Locale.duration(snapshot.betweenMs)}`,
     ].join(" · ")
   }
 

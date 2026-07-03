@@ -633,7 +633,6 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
                 type: "stream.patch",
                 patch: {
                   phase: "idle",
-                  duration: "",
                   timing: "",
                   usage: "",
                   first: true,

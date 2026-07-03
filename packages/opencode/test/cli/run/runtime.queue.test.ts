@@ -225,7 +225,7 @@ describe("run runtime queue", () => {
     expect(ui.events.some((event) => event.type === "turn.duration")).toBe(false)
     expect(ui.events.findLast((event) => event.type === "session.timing")).toEqual({
       type: "session.timing",
-      timing: "session 1.5s · work 1.5s · between 0ms",
+      timing: "total 1.5s · work 1.5s · idle 0ms",
     })
   })
 
@@ -372,7 +372,7 @@ describe("run runtime queue", () => {
     expect(seen).toEqual(["one", "two"])
     expect(ui.events.findLast((event) => event.type === "session.timing")).toEqual({
       type: "session.timing",
-      timing: "session 5.2s · work 4.0s · between 1.2s",
+      timing: "total 5.2s · work 4.0s · idle 1.2s",
     })
   })
 
