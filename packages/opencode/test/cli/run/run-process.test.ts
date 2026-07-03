@@ -139,6 +139,27 @@ describe("opencode run (non-interactive subprocess)", () => {
   )
 
   cliIt.concurrent(
+    "--permission-mode auto still asks for package exec shortcuts",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.tool("bash", {
+          command: "npm exec --version",
+          description: "Run a package-exec shortcut",
+        })
+        yield* llm.text("package exec should not be auto-approved")
+
+        const result = yield* opencode.run("use an unsafe auto command", {
+          extraArgs: ["--permission-mode", "auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stderr).toContain("permission requested: bash")
+        expect(result.stdout).toBe("")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
     "rejects invalid permission mode values",
     ({ opencode }) =>
       Effect.gen(function* () {
