@@ -1117,14 +1117,14 @@ test("direct footer shows full usage metadata when room is available", async () 
 test("direct footer shows auto permission mode when enabled", async () => {
   const app = await renderFooter({
     autoPermission: true,
-    state: { timing: "total 1.2s · work 900ms · idle 300ms" },
+    state: { timing: "total 1.2s · work 900ms · between 300ms" },
   })
 
   try {
     await app.renderOnce()
     const frame = app.captureCharFrame()
 
-    expect(frame).toContain("AUTO · total 1.2s · work 900ms · idle 300ms")
+    expect(frame).toContain("AUTO · total 1.2s · work 900ms · between 300ms")
   } finally {
     app.cleanup()
   }

@@ -103,7 +103,7 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
     return [
       `total ${Locale.duration(snapshot.totalMs)}`,
       `work ${Locale.duration(snapshot.workingMs)}`,
-      `idle ${Locale.duration(snapshot.betweenMs)}`,
+      `between ${Locale.duration(snapshot.betweenMs)}`,
     ].join(" · ")
   }
 
