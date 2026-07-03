@@ -74,6 +74,7 @@ const LOCAL_COMMANDS = new Set([
   "cmake",
   "command",
   "cp",
+  "cut",
   "deno",
   "df",
   "diff",
@@ -118,6 +119,8 @@ const LOCAL_COMMANDS = new Set([
   "xargs",
   "yarn",
 ])
+
+const CWD_COMMANDS = new Set(["cd", "chdir", "pushd", "push-location", "set-location"])
 
 const GIT_INSPECTION = new Set([
   "branch",
@@ -164,7 +167,9 @@ export function classifyShellCommand(input: ShellClassifierInput): ShellClassifi
     return ask("command references path outside project root", "external-directory")
   }
 
-  const unknown = (input.patterns?.length ? input.patterns : [input.command]).find((pattern) => !allowPattern(pattern))
+  const unknown = (input.patterns?.length ? input.patterns : [input.command])
+    .map((pattern) => unsupportedSegment(pattern, cwd, projectRoot))
+    .find((segment): segment is string => Boolean(segment))
   if (unknown) {
     return ask("command is not recognized as a project-local development command", firstToken(unknown) ?? "unknown")
   }
@@ -290,12 +295,22 @@ function resolveReference(reference: string, cwd: string) {
   return canonical(path.isAbsolute(expanded) ? expanded : path.resolve(cwd, expanded))
 }
 
-function allowPattern(pattern: string) {
-  const tokens = tokenize(pattern)
+function allowPattern(pattern: string, cwd: string, projectRoot: string) {
+  return unsupportedSegment(pattern, cwd, projectRoot) === undefined
+}
+
+function unsupportedSegment(pattern: string, cwd: string, projectRoot: string) {
+  return splitCommands(pattern).find((segment) => !allowSegment(segment, cwd, projectRoot))
+}
+
+function allowSegment(segment: string, cwd: string, projectRoot: string) {
+  const tokens = tokenize(segment)
   const command = tokens[0]
-  if (!command) return false
+  if (!command) return true
   if (command.startsWith("./") || command.startsWith("scripts/") || command.startsWith("script/")) return true
   const name = path.basename(command).toLowerCase()
+
+  if (CWD_COMMANDS.has(name)) return cwdTargetInside(tokens, cwd, projectRoot)
 
   if (name === "git") {
     const subcommand = tokens.find((token, index) => index > 0 && !token.startsWith("-"))?.toLowerCase()
@@ -312,8 +327,72 @@ function allowPattern(pattern: string) {
   return LOCAL_COMMANDS.has(name)
 }
 
+function cwdTargetInside(tokens: string[], cwd: string, projectRoot: string) {
+  const target = tokens.slice(1).find((token) => !token.startsWith("-"))
+  if (!target || target === "-") return false
+  const expanded = target
+    .replace(/^\$\{HOME\}/, os.homedir())
+    .replace(/^\$HOME\b/, os.homedir())
+    .replace(/^~(?=$|[\\/])/, os.homedir())
+  if (expanded.includes("$") || expanded.includes("`")) return false
+  return inside(projectRoot, canonical(path.isAbsolute(expanded) ? expanded : path.resolve(cwd, expanded)))
+}
+
 function firstToken(command: string) {
   return tokenize(command)[0]
+}
+
+function splitCommands(command: string) {
+  const segments: string[] = []
+  let current = ""
+  let quote: "'" | '"' | undefined
+  let escaped = false
+  for (let index = 0; index < command.length; index++) {
+    const char = command[index]
+    const next = command[index + 1]
+
+    if (escaped) {
+      current += char
+      escaped = false
+      continue
+    }
+
+    if (char === "\\") {
+      current += char
+      escaped = true
+      continue
+    }
+
+    if (quote) {
+      current += char
+      if (char === quote) quote = undefined
+      continue
+    }
+
+    if (char === "'" || char === '"') {
+      current += char
+      quote = char
+      continue
+    }
+
+    if (char === ";" || char === "\n" || (char === "|" && next !== "|") || (char === "&" && next === "&")) {
+      segments.push(current.trim())
+      current = ""
+      if (char === "&" && next === "&") index++
+      continue
+    }
+
+    if (char === "|" && next === "|") {
+      segments.push(current.trim())
+      current = ""
+      index++
+      continue
+    }
+
+    current += char
+  }
+  segments.push(current.trim())
+  return segments.filter((segment) => segment.length > 0)
 }
 
 function tokenize(command: string) {

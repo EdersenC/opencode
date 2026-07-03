@@ -94,6 +94,10 @@ describe("auto shell classifier - allowed commands", () => {
     "git status",
     "git diff",
     "git log --oneline -5",
+    "cd packages/app && npm test",
+    "cd ./packages/app && bun test",
+    "pushd packages/app && bun test",
+    "cat package.json | head -n 5",
     "mkdir -p src/new-module",
     "touch src/generated.tmp",
     "rm -rf dist",
@@ -137,6 +141,9 @@ describe("auto shell classifier - ask commands", () => {
     "bunx cowsay hi",
     "bun create vite my-app",
     "cd .. && npm test",
+    "cd - && npm test",
+    "cd && npm test",
+    "echo hi && madeup-command",
     "cp src/a.ts ~/a.ts",
     "mv src/a.ts /tmp/a.ts",
     "rm -rf /tmp/foo",
@@ -158,6 +165,27 @@ describe("auto shell classifier - ask commands", () => {
       expect(classify(command, tmp()).decision).toBe("ask")
     })
   }
+})
+
+describe("auto shell classifier - compound command containment", () => {
+  test("reports the unsupported segment in compound commands", () => {
+    expect(classify("echo hi && madeup-command", tmp())).toMatchObject({
+      decision: "ask",
+      matchedRule: "madeup-command",
+    })
+  })
+
+  test("asks when cd target is a symlink outside root", () => {
+    const root = tmp()
+    const outside = tmp()
+    const link = path.join(root, "linked-outside")
+    try {
+      fs.symlinkSync(outside, link, "dir")
+    } catch {
+      return
+    }
+    expect(classify("cd linked-outside && npm test", root).decision).toBe("ask")
+  })
 })
 
 describe("auto shell classifier - deny commands", () => {

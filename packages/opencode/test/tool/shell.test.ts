@@ -3,6 +3,7 @@ import { describe, expect } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Effect, Exit, Layer } from "effect"
 import type * as Scope from "effect/Scope"
+import fs from "fs"
 import os from "os"
 import path from "path"
 import { Config } from "@/config/config"
@@ -251,6 +252,32 @@ describe("tool.shell permissions", () => {
           yield* run(
             {
               command: "npm test",
+            },
+            capture(requests),
+          )
+          const bashReq = requests.find((r) => r.permission === "bash")
+          expect(bashReq?.metadata.autoApprove).toMatchObject({
+            kind: "project-local-shell",
+            safe: true,
+          })
+        }),
+      )
+    }),
+  )
+
+  each("marks project-local cd chains as safe for auto mode", () =>
+    Effect.gen(function* () {
+      const tmp = yield* tmpdirScoped()
+      yield* Effect.sync(() => {
+        fs.mkdirSync(path.join(tmp, "packages", "app"), { recursive: true })
+      })
+      yield* runIn(
+        tmp,
+        Effect.gen(function* () {
+          const requests: Array<Omit<PermissionV1.Request, "id" | "sessionID" | "tool">> = []
+          yield* run(
+            {
+              command: "cd packages/app && npm test",
             },
             capture(requests),
           )
