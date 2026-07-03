@@ -6,7 +6,7 @@ import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
-import { canAutoApprove } from "./auto"
+import { autoDecision } from "./auto"
 
 export const Event = PermissionV1.Event
 
@@ -83,13 +83,34 @@ const layer = Layer.effect(
       }
 
       if (!needsAsk) return
-      if (canAutoApprove(request)) {
+      const auto = autoDecision(request)
+      if (auto?.decision === "allow") {
         yield* Effect.logInfo("auto-approved", {
           permission: request.permission,
           patterns: request.patterns,
-          metadata: request.metadata,
+          reason: auto.reason,
+          matchedRule: auto.matchedRule,
         })
         return
+      }
+      if (auto?.decision === "deny") {
+        yield* Effect.logWarning("auto-denied", {
+          permission: request.permission,
+          patterns: request.patterns,
+          reason: auto.reason,
+          matchedRule: auto.matchedRule,
+        })
+        return yield* new PermissionV1.DeniedError({
+          ruleset: [
+            {
+              permission: request.permission,
+              pattern: request.patterns.join("\n"),
+              action: "deny",
+              reason: auto.reason,
+              matchedRule: auto.matchedRule,
+            },
+          ],
+        })
       }
 
       const id = request.id ?? PermissionV1.ID.ascending()

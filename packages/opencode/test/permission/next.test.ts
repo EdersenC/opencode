@@ -20,6 +20,14 @@ const env = AppNodeBuilder.build(
   [[InstanceStore.bootstrapNode, noopBootstrap]],
 )
 const it = testEffect(env)
+const autoApproval = (command: string, externalDirectories: string[] = []) =>
+  shellApproval({
+    command,
+    cwd: process.cwd(),
+    projectRoot: process.cwd(),
+    patterns: [command],
+    externalDirectories,
+  })
 
 const rejectAll = (message?: string) =>
   Effect.gen(function* () {
@@ -555,14 +563,16 @@ test("disabled - specific allow overrides wildcard deny", () => {
 })
 
 test("auto policy marks only project-local shell requests as safe", () => {
-  expect(shellApproval({ patterns: ["npm test"], externalDirectories: [] })).toMatchObject({ safe: true })
-  expect(shellApproval({ patterns: ["git push"], externalDirectories: [] })).toMatchObject({
+  expect(autoApproval("npm test")).toMatchObject({ safe: true, decision: "allow" })
+  expect(autoApproval("git push")).toMatchObject({
     safe: false,
+    decision: "ask",
     reason: "git push",
   })
-  expect(shellApproval({ patterns: ["npm test"], externalDirectories: ["/etc"] })).toMatchObject({
+  expect(autoApproval("npm test", ["/etc"])).toMatchObject({
     safe: false,
-    reason: "external directory",
+    decision: "ask",
+    reason: "command references path outside project root",
   })
 })
 
@@ -614,7 +624,7 @@ it.instance(
         patterns: ["npm test"],
         metadata: {
           permissionMode: "auto",
-          autoApprove: shellApproval({ patterns: ["npm test"], externalDirectories: [] }),
+          autoApprove: autoApproval("npm test"),
         },
         always: ["npm *"],
         ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
@@ -635,7 +645,7 @@ it.instance(
         patterns: ["git push"],
         metadata: {
           permissionMode: "auto",
-          autoApprove: shellApproval({ patterns: ["git push"], externalDirectories: [] }),
+          autoApprove: autoApproval("git push"),
         },
         always: ["git *"],
         ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
@@ -644,6 +654,29 @@ it.instance(
       expect(yield* waitForPending(1)).toHaveLength(1)
       yield* rejectAll()
       yield* Fiber.await(fiber)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - auto mode denies classifier-denied shell requests",
+  () =>
+    Effect.gen(function* () {
+      const err = yield* fail(
+        ask({
+          sessionID: SessionID.make("session_test"),
+          permission: "bash",
+          patterns: ["rm -rf /"],
+          metadata: {
+            permissionMode: "auto",
+            autoApprove: autoApproval("rm -rf /"),
+          },
+          always: ["rm *"],
+          ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
+        }),
+      )
+      expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(yield* list()).toHaveLength(0)
     }),
   { git: true },
 )
@@ -659,7 +692,7 @@ it.instance(
           patterns: ["npm test"],
           metadata: {
             permissionMode: "auto",
-            autoApprove: shellApproval({ patterns: ["npm test"], externalDirectories: [] }),
+            autoApprove: autoApproval("npm test"),
           },
           always: ["npm *"],
           ruleset: [{ permission: "bash", pattern: "*", action: "deny" }],

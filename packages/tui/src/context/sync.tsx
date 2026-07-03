@@ -51,17 +51,22 @@ function search<T>(items: T[], target: string, key: (item: T) => string) {
   return { found: false, index: left }
 }
 
-function safeAutoPermission(request: PermissionRequest) {
+function autoPermissionDecision(request: PermissionRequest) {
   const approval = request.metadata?.autoApprove
-  return (
-    request.permission === "bash" &&
-    typeof approval === "object" &&
-    approval !== null &&
-    "kind" in approval &&
-    approval.kind === "project-local-shell" &&
-    "safe" in approval &&
-    approval.safe === true
-  )
+  if (
+    request.permission !== "bash" ||
+    typeof approval !== "object" ||
+    approval === null ||
+    !("kind" in approval) ||
+    approval.kind !== "project-local-shell"
+  ) {
+    return
+  }
+  if ("decision" in approval) {
+    const decision = approval.decision
+    if (decision === "allow" || decision === "ask" || decision === "deny") return decision
+  }
+  if ("safe" in approval && approval.safe === true) return "allow"
 }
 
 export const {
@@ -202,13 +207,13 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (
-            (permission.mode === "auto" || (store.config as { permission_mode?: string }).permission_mode === "auto") &&
-            safeAutoPermission(request)
-          ) {
+          const auto =
+            permission.mode === "auto" || (store.config as { permission_mode?: string }).permission_mode === "auto"
+          const decision = autoPermissionDecision(request)
+          if (auto && (decision === "allow" || decision === "deny")) {
             void sdk.client.permission.reply({
               requestID: request.id,
-              reply: "once",
+              reply: decision === "allow" ? "once" : "reject",
               directory,
               workspace,
             })

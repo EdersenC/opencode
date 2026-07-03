@@ -22,15 +22,17 @@ export function isDirectoryAutoAccepting(autoAccept: Record<string, boolean>, di
 
 function safeAutoPermission(permission: { permission?: string; metadata?: Record<string, unknown> }) {
   const approval = permission.metadata?.autoApprove
-  return (
-    permission.permission === "bash" &&
-    typeof approval === "object" &&
-    approval !== null &&
-    "kind" in approval &&
-    approval.kind === "project-local-shell" &&
-    "safe" in approval &&
-    approval.safe === true
-  )
+  if (
+    permission.permission !== "bash" ||
+    typeof approval !== "object" ||
+    approval === null ||
+    !("kind" in approval) ||
+    approval.kind !== "project-local-shell"
+  ) {
+    return false
+  }
+  if ("decision" in approval) return approval.decision === "allow"
+  return "safe" in approval && approval.safe === true
 }
 
 function sessionLineage(session: { id: string; parentID?: string }[], sessionID: string) {

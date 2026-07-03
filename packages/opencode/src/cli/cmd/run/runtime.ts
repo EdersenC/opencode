@@ -15,7 +15,7 @@
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { MessageID } from "@/session/schema"
-import { canAutoApproveRequest } from "@/permission/auto"
+import { canAutoApproveRequest, canAutoDenyRequest } from "@/permission/auto"
 import { createRunDemo } from "./demo"
 import { resolveModelInfo, resolveRunTuiConfig, resolveSessionInfo } from "./runtime.boot"
 import { createRuntimeLifecycle } from "./runtime.lifecycle"
@@ -488,17 +488,27 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         trace: log,
         onAutoPermission: input.autoPermission
           ? (request) => {
-              if (!canAutoApproveRequest(request)) {
-                return false
+              if (canAutoApproveRequest(request)) {
+                void ctx.sdk.permission
+                  .reply({
+                    requestID: request.id,
+                    reply: "once",
+                  })
+                  .catch(() => {})
+                return true
               }
 
-              void ctx.sdk.permission
-                .reply({
-                  requestID: request.id,
-                  reply: "once",
-                })
-                .catch(() => {})
-              return true
+              if (canAutoDenyRequest(request)) {
+                void ctx.sdk.permission
+                  .reply({
+                    requestID: request.id,
+                    reply: "reject",
+                  })
+                  .catch(() => {})
+                return true
+              }
+
+              return false
             }
           : undefined,
       })

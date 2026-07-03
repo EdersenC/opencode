@@ -261,7 +261,11 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
   return tree
 })
 
-const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan, input: { command: string }) {
+const ask = Effect.fn("ShellTool.ask")(function* (
+  ctx: Tool.Context,
+  scan: Scan,
+  input: { command: string; cwd: string; projectRoot: string },
+) {
   const directories = Array.from(scan.dirs)
   if (scan.dirs.size > 0) {
     const globs = directories.map((dir) => {
@@ -288,7 +292,13 @@ const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan,
     always: Array.from(scan.always),
     metadata: {
       command: input.command,
-      autoApprove: shellApproval({ patterns, externalDirectories: directories }),
+      autoApprove: shellApproval({
+        command: input.command,
+        cwd: input.cwd,
+        projectRoot: input.projectRoot,
+        patterns,
+        externalDirectories: directories,
+      }),
     },
   })
 })
@@ -627,7 +637,11 @@ export const ShellTool = Tool.define(
                   )
                   const scan = yield* collect(tree.rootNode, cwd, ps, shell, instanceCtx)
                   if (!containsPath(cwd, instanceCtx)) scan.dirs.add(cwd)
-                  yield* ask(ctx, scan, params)
+                  yield* ask(ctx, scan, {
+                    command: params.command,
+                    cwd,
+                    projectRoot: instanceCtx.worktree,
+                  })
                 }),
               )
 

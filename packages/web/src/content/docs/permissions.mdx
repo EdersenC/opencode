@@ -33,7 +33,7 @@ You can also use `--permission-mode auto`, including with [`opencode run`](/docs
 opencode run --permission-mode auto "Refactor this module"
 ```
 
-Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask.
+Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask. Clearly destructive commands such as deleting root or home directories are denied.
 
 You can make auto mode persistent in config:
 
