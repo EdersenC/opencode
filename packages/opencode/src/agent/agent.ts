@@ -11,12 +11,12 @@ import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
-import PROMPT_CODER from "./prompt/coder.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
-import PROMPT_ORCHESTRATE from "./prompt/orchestrate.txt"
-import PROMPT_PLANNER from "./prompt/planner.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import { createCoderPrompt } from "./prompt/coder"
+import { createOrchestratePrompt } from "./prompt/orchestrate"
+import { createPlannerPrompt } from "./prompt/planner"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
@@ -63,6 +63,10 @@ const GeneratedAgent = Schema.Struct({
   whenToUse: Schema.String,
   systemPrompt: Schema.String,
 })
+
+const PROMPT_ORCHESTRATE = createOrchestratePrompt()
+const PROMPT_CODER = createCoderPrompt()
+const PROMPT_PLANNER = createPlannerPrompt()
 
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>
