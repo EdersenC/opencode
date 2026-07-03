@@ -156,14 +156,18 @@ describe("tool.task", () => {
         expect(first).toBe(second)
 
         const alpha = first.indexOf("- alpha: Alpha agent")
+        const coder = first.indexOf("- coder:")
         const explore = first.indexOf("- explore:")
         const general = first.indexOf("- general:")
+        const planner = first.indexOf("- planner:")
         const zebra = first.indexOf("- zebra: Zebra agent")
 
         expect(alpha).toBeGreaterThan(-1)
-        expect(explore).toBeGreaterThan(alpha)
+        expect(coder).toBeGreaterThan(alpha)
+        expect(explore).toBeGreaterThan(coder)
         expect(general).toBeGreaterThan(explore)
-        expect(zebra).toBeGreaterThan(general)
+        expect(planner).toBeGreaterThan(general)
+        expect(zebra).toBeGreaterThan(planner)
       }),
     {
       config: {

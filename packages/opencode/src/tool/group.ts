@@ -1,0 +1,297 @@
+import * as Tool from "./tool"
+import DESCRIPTION from "./group.txt"
+import { TaskTool } from "./task"
+import { Cause, Effect, Exit, Schema } from "effect"
+
+const id = "group"
+
+const TaskInput = Schema.Struct({
+  description: Schema.NonEmptyString.annotate({ description: "A short description of the nested task" }),
+  prompt: Schema.NonEmptyString.annotate({ description: "The task for the subagent to perform" }),
+  subagent_type: Schema.NonEmptyString.annotate({ description: "The type of specialized agent to use for this task" }),
+  task_id: Schema.optional(Schema.String).annotate({ description: "Existing task session ID to resume" }),
+  command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
+  background: Schema.optional(Schema.Boolean).annotate({
+    description: "Unsupported in group v1. Nested calls must run in foreground.",
+  }),
+})
+
+const NestedCall = Schema.Struct({
+  tool: Schema.String.annotate({ description: 'Nested tool id. v1 supports only "task".' }),
+  name: Schema.NonEmptyString.annotate({ description: "Stable nested call name" }),
+  description: Schema.NonEmptyString.annotate({ description: "Nested call description" }),
+  input: TaskInput,
+})
+
+export const Parameters = Schema.Struct({
+  name: Schema.NonEmptyString.annotate({ description: "Stable group name" }),
+  description: Schema.NonEmptyString.annotate({ description: "What this logical group is meant to accomplish" }),
+  priority: Schema.Literals(["low", "medium", "high"])
+    .annotate({ description: "Group priority. Defaults to medium.", default: "medium" })
+    .pipe(Schema.withDecodingDefault(Effect.succeed("medium" as const))),
+  calls: Schema.NonEmptyArray(NestedCall).annotate({ description: "Nested task calls to execute concurrently" }),
+  fail_fast: Schema.optional(Schema.Boolean).annotate({
+    description: "Defaults to false. v1 still waits for all nested calls to settle.",
+  }),
+})
+
+type Params = typeof Parameters.Type
+
+type CallResult = {
+  index: number
+  tool: "task"
+  name: string
+  description: string
+  state: "completed" | "failed" | "aborted"
+  title?: string
+  metadata?: unknown
+  output?: string
+  error?: string
+  durationMs: number
+}
+
+function validate(params: Params) {
+  for (const [index, call] of params.calls.entries()) {
+    if (call.tool === "group") throw new Error(`group call ${index} is recursive; nested group calls are not supported`)
+    if (call.tool !== "task")
+      throw new Error(`group call ${index} uses unsupported nested tool "${call.tool}"; v1 supports only "task"`)
+    if (call.input.background === true)
+      throw new Error(
+        `group call ${index} sets input.background=true; nested background tasks are not supported in group v1`,
+      )
+  }
+}
+
+function safeName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "group"
+}
+
+function escapeAttr(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+}
+
+function renderOutput(input: {
+  name: string
+  description: string
+  priority: string
+  state: "completed" | "completed_with_errors" | "failed" | "aborted"
+  completedCount: number
+  failedCount: number
+  calls: readonly CallResult[]
+}) {
+  return [
+    `<group name="${escapeAttr(input.name)}" priority="${input.priority}" state="${input.state}">`,
+    "<group_description>",
+    input.description,
+    "</group_description>",
+    "<group_summary>",
+    [
+      `Completed ${input.completedCount} of ${input.calls.length} calls.`,
+      `Failed ${input.failedCount} of ${input.calls.length} calls.`,
+    ].join(" "),
+    "</group_summary>",
+    "<group_results>",
+    ...input.calls.flatMap((call) => [
+      [
+        `<call index="${call.index}" tool="task" name="${escapeAttr(call.name)}"`,
+        `title="${escapeAttr(call.title ?? call.name)}" state="${call.state}">`,
+      ].join(" "),
+      "<call_description>",
+      call.description,
+      "</call_description>",
+      call.state === "completed" ? "<call_result>" : "<call_error>",
+      call.state === "completed" ? (call.output ?? "") : (call.error ?? "Task failed"),
+      call.state === "completed" ? "</call_result>" : "</call_error>",
+      "</call>",
+    ]),
+    "</group_results>",
+    "</group>",
+  ].join("\n")
+}
+
+function stateFor(calls: readonly CallResult[], parentAborted: boolean) {
+  if (parentAborted || calls.every((call) => call.state === "aborted")) return "aborted" as const
+  const completedCount = calls.filter((call) => call.state === "completed").length
+  if (completedCount === calls.length) return "completed" as const
+  if (completedCount === 0) return "failed" as const
+  return "completed_with_errors" as const
+}
+
+function errorMessage(exit: Exit.Exit<unknown, unknown>) {
+  if (Exit.isSuccess(exit)) return undefined
+  const error = Cause.squash(exit.cause)
+  return error instanceof Error ? error.message : String(error)
+}
+
+export const GroupTool = Tool.define(
+  id,
+  Effect.gen(function* () {
+    const task = yield* TaskTool
+    const taskDef = yield* task.init()
+
+    return {
+      description: DESCRIPTION,
+      parameters: Parameters,
+      execute: (params: Params, ctx: Tool.Context) =>
+        Effect.gen(function* () {
+          validate(params)
+
+          const startedAt = Date.now()
+          const groupName = safeName(params.name)
+          yield* ctx.ask({
+            permission: id,
+            patterns: [params.name],
+            always: ["*"],
+            metadata: {
+              name: params.name,
+              description: params.description,
+              priority: params.priority,
+              callCount: params.calls.length,
+            },
+          })
+          yield* ctx.metadata({
+            title: `Group: ${params.name}`,
+            metadata: {
+              group: {
+                name: params.name,
+                description: params.description,
+                priority: params.priority,
+                state: "running",
+                callCount: params.calls.length,
+                completedCount: 0,
+                failedCount: 0,
+                startedAt,
+                completedAt: startedAt,
+                durationMs: 0,
+              },
+              calls: params.calls.map((call, index) => ({
+                index,
+                tool: "task",
+                name: call.name,
+                description: call.description,
+                state: "running",
+                durationMs: 0,
+              })),
+            },
+          })
+
+          // fail_fast is accepted for forward compatibility, but v1 keeps all-settled
+          // semantics so every nested result can be returned in one grouped output.
+          const calls = yield* Effect.forEach(
+            params.calls,
+            (call, index) =>
+              Effect.gen(function* () {
+                const callStarted = Date.now()
+                const title = `${index + 1}. ${call.name || call.description}`
+                const nestedCallID = [ctx.callID ?? "call", "group", groupName, String(index)].join(":")
+                const exit = yield* taskDef
+                  .execute(
+                    {
+                      description: call.input.description,
+                      prompt: call.input.prompt,
+                      subagent_type: call.input.subagent_type,
+                      ...(call.input.task_id ? { task_id: call.input.task_id } : {}),
+                      ...(call.input.command ? { command: call.input.command } : {}),
+                    },
+                    {
+                      ...ctx,
+                      callID: nestedCallID,
+                      metadata: (value) =>
+                        ctx.metadata({
+                          title,
+                          metadata: value.metadata,
+                        }),
+                    },
+                  )
+                  .pipe(Effect.exit)
+                const durationMs = Date.now() - callStarted
+                if (Exit.isSuccess(exit)) {
+                  if (ctx.abort.aborted) {
+                    return {
+                      index,
+                      tool: "task" as const,
+                      name: call.name,
+                      description: call.description,
+                      state: "aborted" as const,
+                      title,
+                      error: "Task aborted",
+                      durationMs,
+                    }
+                  }
+                  return {
+                    index,
+                    tool: "task" as const,
+                    name: call.name,
+                    description: call.description,
+                    state: "completed" as const,
+                    title,
+                    metadata: exit.value.metadata,
+                    output: exit.value.output,
+                    durationMs,
+                  }
+                }
+                return {
+                  index,
+                  tool: "task" as const,
+                  name: call.name,
+                  description: call.description,
+                  state: ctx.abort.aborted ? ("aborted" as const) : ("failed" as const),
+                  title,
+                  error: errorMessage(exit),
+                  durationMs,
+                }
+              }),
+            { concurrency: "unbounded" },
+          )
+
+          const completedAt = Date.now()
+          const completedCount = calls.filter((call) => call.state === "completed").length
+          const failedCount = calls.length - completedCount
+          const state = stateFor(calls, ctx.abort.aborted)
+          const metadata = {
+            group: {
+              name: params.name,
+              description: params.description,
+              priority: params.priority,
+              state,
+              callCount: calls.length,
+              completedCount,
+              failedCount,
+              startedAt,
+              completedAt,
+              durationMs: completedAt - startedAt,
+            },
+            calls: calls.map((call) => ({
+              index: call.index,
+              tool: call.tool,
+              name: call.name,
+              description: call.description,
+              state: call.state,
+              ...(call.title ? { title: call.title } : {}),
+              ...(call.metadata !== undefined ? { metadata: call.metadata } : {}),
+              durationMs: call.durationMs,
+            })),
+          }
+
+          return {
+            title: `Group: ${params.name}`,
+            metadata,
+            output: renderOutput({
+              name: params.name,
+              description: params.description,
+              priority: params.priority,
+              state,
+              completedCount,
+              failedCount,
+              calls,
+            }),
+          }
+        }),
+    }
+  }),
+)

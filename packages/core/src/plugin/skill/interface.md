@@ -1,0 +1,165 @@
+# Interface Skill
+
+Use this skill when a large task needs multiple implementation agents.
+
+Purpose:
+Create contract-first interfaces and handoff documents before dispatching coder agents.
+
+## When To Use
+
+- After planning is complete.
+- Before multiple coder agents start editing.
+- When a feature spans multiple modules, services, layers, packages, components, or teams of subagents.
+- When shared contracts, APIs, DTOs, adapters, messages, protocols, events, or data flows must be agreed on before implementation.
+- When parallel coder work would otherwise risk overlapping edits or incompatible assumptions.
+
+## When Not To Use
+
+- Single-file edits.
+- Small bug fixes.
+- Tasks where one coder can safely implement everything.
+- Pure research or planning.
+- Work that already has clean, sufficient contracts and one obvious implementation path.
+
+## Workflow
+
+1. Read the chosen plan and repo context.
+2. Identify module and work-package boundaries.
+3. Identify implementation seams: modules, directories, packages, services, components, adapters, layers, interfaces, schemas, DTOs, messages, data shapes, APIs, protocols, traits, abstract classes, boundary functions, and dependency direction.
+4. Create or update interface contracts.
+5. Create handoff README files.
+6. Create a work-package map.
+7. Decide which coder tasks can run in parallel and which must run sequentially.
+8. Produce coder dispatch prompts.
+
+## Interface Contracts
+
+Create actual interface code when it reduces coordination risk or clarifies a boundary:
+
+- TypeScript: interfaces, types, contracts, DTOs, schemas, adapter signatures.
+- Go: interfaces, structs, package-level contracts, narrow exported methods.
+- Python: Protocols, abstract base classes, dataclasses, type hints, module boundaries.
+- Rust: traits, structs, enums, modules, error types.
+- Java, Kotlin, or C#: interfaces, classes, records, DTOs, service contracts.
+- Languages without formal interfaces: public function signatures, schemas, DTOs, documentation, tests, fixtures, and examples as contracts.
+
+Avoid overengineering. Do not create abstractions only for ceremony. Create the smallest contract that lets independent coders work safely.
+
+## Recommended Artifacts
+
+- `docs/orchestration/<feature-slug>/overview.md`
+- `docs/orchestration/<feature-slug>/work-packages.md`
+- `docs/orchestration/<feature-slug>/interfaces.md`
+- `<module-or-package>/README.md` for new modules
+- Language-native interface, type, protocol, trait, schema, DTO, or adapter files
+- Optional contract tests when useful
+
+Follow the repo's existing documentation and architecture conventions when they exist. Prefer local handoff docs near the code for new module folders. Use `docs/orchestration/<feature-slug>/` for cross-cutting coordination docs when no better convention exists.
+
+## Work-Package Boundaries
+
+Each coder should receive a clear ownership slice:
+
+- Owned files and directories.
+- Files and directories to avoid.
+- Shared contract files that should not be casually changed.
+- Upstream and downstream dependencies.
+- Public contracts the slice must implement or respect.
+- Expected tests and verification commands.
+- Known risks and escalation questions.
+
+Avoid overlapping edit scopes. If overlap is unavoidable, make one task own the shared contract and make other tasks depend on it.
+
+## Parallel Versus Sequential Guidance
+
+Run coder tasks in parallel only when their owned files and contracts are clear, their dependencies already exist, and they can complete without editing the same files.
+
+Run coder tasks sequentially when:
+
+- One slice creates shared interfaces, schemas, migrations, or generated code another slice depends on.
+- Two slices must edit the same file or directory.
+- A dependency decision is unresolved.
+- A failed contract test would invalidate downstream work.
+- The blast radius is high enough that review should happen between phases.
+
+When unsure, create contracts first, dispatch independent implementation slices second, then run a grouped review and verification pass.
+
+## Coder Dispatch Prompts
+
+Each coder prompt should include:
+
+- Assigned scope.
+- Interface or handoff README path.
+- Files and directories to own.
+- Files and directories to avoid.
+- Public contracts to implement or respect.
+- Expected tests.
+- Known risks.
+- Question escalation protocol.
+
+Tell coders to read the handoff README first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to the orchestrator instead of silently inventing incompatible behavior.
+
+## Required Handoff README Template
+
+```markdown
+# <Work Package Name>
+
+## Purpose
+Describe what this slice owns.
+
+## User Goal
+Summarize the user-facing goal this work supports.
+
+## Selected Plan
+Summarize the plan this slice follows.
+
+## Owned Scope
+List directories/files this coder should primarily edit.
+
+## Avoid / Do Not Edit
+List files/directories owned by other slices.
+
+## Public Interfaces / Contracts
+List interfaces, types, functions, events, schemas, API endpoints, messages, or DTOs this slice must implement or respect.
+
+## Dependencies
+List upstream/downstream dependencies.
+
+## Implementation Notes
+Give concrete guidance, constraints, and style expectations.
+
+## Testing Expectations
+List tests to add/run.
+
+## Questions / Risks
+List known unknowns and when to escalate to orchestrator.
+```
+
+## Required Work-Package Map Template
+
+```markdown
+# Work Packages
+
+## Package: <name>
+- Coder task name:
+- Priority:
+- Owned scope:
+- Handoff doc:
+- Contracts:
+- Depends on:
+- Can run in parallel with:
+- Must run after:
+- Review focus:
+```
+
+## Final Output To Prepare
+
+Prepare a concise interface-phase summary for the orchestrator:
+
+- Contract files created or updated.
+- Handoff README files created or updated.
+- Work-package map path.
+- Coder task prompts ready to dispatch.
+- Parallel groups and sequential dependencies.
+- Shared files that coders must not casually edit.
+- Remaining questions or risks before implementation.

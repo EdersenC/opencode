@@ -27,7 +27,7 @@ Primary agents are the main assistants you interact with directly. You can cycle
 You can use the **Tab** key to switch between primary agents during a session.
 :::
 
-OpenCode comes with two built-in primary agents, **Build** and **Plan**. We'll
+OpenCode comes with three built-in primary agents, **Build**, **Plan**, and **Orchestrate**. We'll
 look at these below.
 
 ---
@@ -36,13 +36,13 @@ look at these below.
 
 Subagents are specialized assistants that primary agents can invoke for specific tasks. You can also manually invoke them by **@ mentioning** them in your messages.
 
-OpenCode comes with three built-in subagents, **General**, **Explore**, and **Scout**. We'll look at this below.
+OpenCode comes with five built-in subagents, **General**, **Explore**, **Planner**, **Coder**, and **Scout**. We'll look at this below.
 
 ---
 
 ## Built-in
 
-OpenCode comes with two built-in primary agents and three built-in subagents.
+OpenCode comes with three built-in primary agents and five built-in subagents.
 
 ---
 
@@ -68,6 +68,16 @@ This agent is useful when you want the LLM to analyze code, suggest changes, or 
 
 ---
 
+### Use orchestrate
+
+_Mode_: `primary`
+
+An agent for large, ambiguous, or multi-part goals where parallel planning, implementation, and review are useful. It decomposes work into grouped subagent tasks, asks clarifying questions early when requirements are ambiguous, compares multiple plans, coordinates implementation, and synthesizes results.
+
+In normal CLI/TUI, app, and desktop usage, Orchestrate can use the `question` tool when its permissions allow it. Other runtime clients may hide `question` unless `OPENCODE_ENABLE_QUESTION_TOOL` is enabled.
+
+---
+
 ### Use general
 
 _Mode_: `subagent`
@@ -81,6 +91,22 @@ A general-purpose agent for researching complex questions and executing multi-st
 _Mode_: `subagent`
 
 A fast, read-only agent for exploring codebases. Cannot modify files. Use this when you need to quickly find files by patterns, search code for keywords, or answer questions about the codebase.
+
+---
+
+### Use planner
+
+_Mode_: `subagent`
+
+A read-only planning agent that creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel through Orchestrate and the Task/Group tools to compare approaches such as minimal viable, robust architecture, risk-first, or integration-first plans.
+
+---
+
+### Use coder
+
+_Mode_: `subagent`
+
+An implementation agent for scoped, high-quality coding work. Users usually do not select Coder directly; Orchestrate dispatches coder agents through grouped Task calls after planning and interface or contract preparation.
 
 ---
 
@@ -437,6 +463,7 @@ The available permission keys are:
 | `grep`               | `grep`                                                           |
 | `list`               | `list`                                                           |
 | `bash`               | `bash`                                                           |
+| `group`              | `group`                                                          |
 | `task`               | `task`                                                           |
 | `external_directory` | Any tool that reads or writes files outside the project worktree |
 | `todowrite`          | `todowrite`, `todoread`                                          |
@@ -447,7 +474,7 @@ The available permission keys are:
 | `question`           | `question`                                                       |
 | `doom_loop`          | Recovery prompts when an agent appears stuck                     |
 
-`read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `lsp`, and `skill` accept either a shorthand action (`"allow" | "ask" | "deny"`) or an object of glob/pattern → action for fine-grained control. The remaining keys accept the shorthand action only.
+`read`, `edit`, `glob`, `grep`, `list`, `bash`, `group`, `task`, `external_directory`, `lsp`, and `skill` accept either a shorthand action (`"allow" | "ask" | "deny"`) or an object of glob/pattern → action for fine-grained control. The remaining keys accept the shorthand action only.
 
 :::note
 Permission keys are matched as wildcard patterns against the underlying tool name, so the same syntax works for built-ins, custom tools, and MCP tools — for example `"mymcp_*": "deny"` denies every tool from an MCP server, and `"mymcp_search": "ask"` targets a single one.

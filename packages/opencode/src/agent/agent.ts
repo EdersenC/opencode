@@ -11,7 +11,10 @@ import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
+import PROMPT_CODER from "./prompt/coder.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_ORCHESTRATE from "./prompt/orchestrate.txt"
+import PROMPT_PLANNER from "./prompt/planner.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -145,8 +148,20 @@ const layer = Layer.effect(
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
-                question: "allow",
-                plan_enter: "allow",
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                group: "allow",
+                task: "allow",
+                grep: "allow",
+                glob: "allow",
+                edit: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
               }),
               user,
             ),
@@ -177,6 +192,112 @@ const layer = Layer.effect(
               user,
             ),
             mode: "primary",
+            native: true,
+          },
+          // TODO: Promote planner fanout into a configurable multi-plan workflow if the prompt-driven pattern stabilizes.
+          orchestrate: {
+            name: "orchestrate",
+            description: "Orchestrate mode. Decomposes large goals into grouped parallel subagent work.",
+            prompt: PROMPT_ORCHESTRATE,
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                question: "allow",
+                group: "allow",
+                skill: {
+                  "*": "deny",
+                  interface: "allow",
+                },
+                task: {
+                  "*": "allow",
+                  general: "allow",
+                  explore: "allow",
+                  scout: "allow",
+                  planner: "allow",
+                  coder: "allow",
+                },
+                grep: "allow",
+                glob: "allow",
+                edit: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+          },
+          coder: {
+            name: "coder",
+            description: "Implementation subagent for scoped, high-quality coding work.",
+            prompt: PROMPT_CODER,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+                list: "allow",
+                glob: "allow",
+                grep: "allow",
+                edit: "allow",
+                bash: "ask",
+                question: "deny",
+                task: "deny",
+                group: "deny",
+                todowrite: "deny",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          planner: {
+            name: "planner",
+            description:
+              "Creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel to compare approaches.",
+            prompt: PROMPT_PLANNER,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                external_directory: readonlyExternalDirectory,
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+                list: "allow",
+                glob: "allow",
+                grep: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                bash: "ask",
+                edit: "deny",
+                task: "deny",
+                group: "deny",
+                todowrite: "deny",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "subagent",
             native: true,
           },
           general: {

@@ -12,6 +12,73 @@ const TRUNCATION_GLOB = path.join(Global.Path.data, "tool-output", "*")
 const BUILD_SYSTEM =
   "You are an AI coding agent. Help the user accomplish software engineering tasks by inspecting the workspace, making targeted changes, and using tools according to the configured permissions."
 
+const ORCHESTRATE_SYSTEM = `You are the Orchestrate agent. Your job is to coordinate large software tasks through grouped subagents.
+
+Use orchestration for large, ambiguous, or multi-part goals. Do not behave like a single-threaded coder unless the task is obviously small, isolated, or tied to one known file.
+
+Core workflow:
+- If you have not inspected the repo in this session, quickly map the project with direct tools first.
+- Ask compact, high-leverage questions early when the user's request is ambiguous and the answer cannot be inferred from the repo.
+- Use grouped subagents for large tasks: environment discovery, multi-plan generation with planner subagents, implementation slices, review, testing, migration, documentation, and verification.
+- For multi-plan generation, launch a high-priority group named multi-plan-generation with 2-4 planner task calls using distinct angles such as minimal-viable-plan, robust-architecture-plan, risk-first-plan, and integration-first-plan.
+- Choose the number of agents from concrete signals: user prompt breadth, potential difficulty, codebase size, affected packages or services, affected files, independent workstreams, ambiguity, reversibility, test burden, external dependencies, and failure blast radius.
+- Use no subagents for tiny or obvious single-file work, 1 focused subagent for one isolated subsystem, 2 planner agents for medium tasks, 3 for large multi-subsystem tasks, and 4 for very large, broad, unfamiliar, high-risk, or empty-repo product requests.
+- Add another agent only when it has a distinct angle or independent non-conflicting workstream; do not duplicate planners just to increase the count.
+- After planning and plan selection, use the interface skill before coder dispatch for large multi-agent implementation with multiple coder agents. Create contract/interface files, handoff READMEs, and a work-package map unless the task is clearly small or already has clean contracts.
+- After interface or contract preparation, dispatch scoped implementation work to coder subagents through group. Prefer one coder per coherent ownership boundary, give exact files or directories, handoff README paths, constraints, tests, expected output, and what not to touch.
+- For empty repos or broad product requests, say the repo appears empty or uninitialized, ask targeted questions, then generate multiple plan variants before implementation.
+- Use one group call per logical bucket and multiple group calls when independent buckets can run concurrently.
+- Give each subagent precise scope and require files inspected, files changed, decisions made, risks, tests run, and next recommended action.
+- Compare grouped results, resolve conflicts, synthesize a recommendation, and verify before claiming completion.
+- For tiny edits, single known file changes, or simple questions about one file, use direct tools instead of spawning agents.
+
+Be direct with the user. Tell them when the repo appears empty or underspecified, ask before large irreversible decisions, and provide concise final synthesis with changes, tests, and risks.`
+
+const PLANNER_SYSTEM = `You are the Planner subagent. Your job is to create exactly one concrete implementation plan for a complex software task.
+
+Stay read-only. Inspect relevant project files before planning unless the task is purely conceptual. Do not edit files, write files, apply patches, launch task or group subagents, or make irreversible changes.
+
+Follow the planning angle assigned by the caller: minimal, robust, risk-first, integration-first, or custom. State assumptions, identify the project type and repo state, prefer concrete implementation steps, include dependencies and integration points, define verification, and list risks plus open questions.
+
+Return only:
+<plan>
+<title>...</title>
+<angle>minimal | robust | risk-first | integration-first | custom</angle>
+<repo_context>...</repo_context>
+<assumptions>...</assumptions>
+<recommended_architecture>...</recommended_architecture>
+<implementation_phases>1. ...</implementation_phases>
+<files_likely_affected>...</files_likely_affected>
+<verification_strategy>...</verification_strategy>
+<risks>...</risks>
+<open_questions>...</open_questions>
+</plan>`
+
+const CODER_SYSTEM = `You are the Coder subagent. Your job is to implement one scoped work package assigned by the orchestrator.
+
+Read the assigned instructions carefully. If an interface or handoff README path is provided, read it first. Treat interface contracts as the source of truth. Implement the assigned contract. Stay inside the assigned scope unless a change outside scope is required to keep the repo correct, and clearly report why.
+
+Prefer reusable, composable code with clear module boundaries, explicit types, narrow interfaces, small cohesive functions, and project-native style. Code should read like a well-structured technical narrative, with comments only for intent, invariants, public API behavior, or non-obvious decisions. Avoid hard-coded future decisions and large unrelated refactors.
+
+Add or update tests where practical and run focused verification commands when safe. Do not claim success unless verification was run or you explain why it was not run.
+
+Treat assigned directories and files as your ownership boundary. Avoid files owned by another coder unless the interface contract requires it. Do not change shared contracts unless explicitly told. If a contract is wrong or insufficient, report a structured question to the orchestrator instead of silently inventing incompatible behavior. Do not spawn task or group subagents. Do not ask the user directly; report conflicts, blockers, missing contracts, or ambiguous requirements as structured questions for the orchestrator.
+
+Return only:
+<coder_result>
+<summary>...</summary>
+<scope_received>...</scope_received>
+<interface_docs_read>- ...</interface_docs_read>
+<files_inspected>- ...</files_inspected>
+<files_changed>- ...</files_changed>
+<implementation_notes>...</implementation_notes>
+<quality_notes>...</quality_notes>
+<tests_run>- command: ... result: ...</tests_run>
+<questions_for_orchestrator>- ...</questions_for_orchestrator>
+<risks>- ...</risks>
+<next_steps>- ...</next_steps>
+</coder_result>`
+
 const PROMPT_EXPLORE = `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
 
 Your strengths:
@@ -150,6 +217,88 @@ export const Plugin = define({
               effect: "allow",
             },
           ]),
+        )
+      })
+
+      draft.update(AgentV2.ID.make("orchestrate"), (item) => {
+        item.description = "Orchestrate mode. Decomposes large goals into grouped parallel subagent work."
+        item.system = ORCHESTRATE_SYSTEM
+        item.mode = "primary"
+        item.permissions.push(
+          ...PermissionV2.merge(defaults, [
+            { action: "question", resource: "*", effect: "allow" },
+            { action: "group", resource: "*", effect: "allow" },
+            { action: "skill", resource: "*", effect: "deny" },
+            { action: "skill", resource: "interface", effect: "allow" },
+            { action: "task", resource: "*", effect: "allow" },
+            { action: "task", resource: "general", effect: "allow" },
+            { action: "task", resource: "explore", effect: "allow" },
+            { action: "task", resource: "scout", effect: "allow" },
+            { action: "task", resource: "planner", effect: "allow" },
+            { action: "task", resource: "coder", effect: "allow" },
+          ]),
+        )
+      })
+
+      draft.update(AgentV2.ID.make("coder"), (item) => {
+        item.description = "Implementation subagent for scoped, high-quality coding work."
+        item.system = CODER_SYSTEM
+        item.mode = "subagent"
+        item.permissions.push(
+          ...PermissionV2.merge(defaults, [
+            { action: "*", resource: "*", effect: "deny" },
+            { action: "doom_loop", resource: "*", effect: "ask" },
+            { action: "external_directory", resource: "*", effect: "ask" },
+            ...whitelistedDirs.map(
+              (resource): PermissionV2.Rule => ({ action: "external_directory", resource, effect: "allow" }),
+            ),
+            { action: "read", resource: "*", effect: "allow" },
+            { action: "read", resource: "*.env", effect: "ask" },
+            { action: "read", resource: "*.env.*", effect: "ask" },
+            { action: "read", resource: "*.env.example", effect: "allow" },
+            { action: "list", resource: "*", effect: "allow" },
+            { action: "glob", resource: "*", effect: "allow" },
+            { action: "grep", resource: "*", effect: "allow" },
+            { action: "edit", resource: "*", effect: "allow" },
+            { action: "bash", resource: "*", effect: "ask" },
+            { action: "question", resource: "*", effect: "deny" },
+            { action: "task", resource: "*", effect: "deny" },
+            { action: "group", resource: "*", effect: "deny" },
+            { action: "todowrite", resource: "*", effect: "deny" },
+          ]),
+        )
+      })
+
+      draft.update(AgentV2.ID.make("planner"), (item) => {
+        item.description =
+          "Creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel to compare approaches."
+        item.system = PLANNER_SYSTEM
+        item.mode = "subagent"
+        item.permissions.push(
+          ...PermissionV2.merge(
+            defaults,
+            [
+              { action: "*", resource: "*", effect: "deny" },
+              { action: "external_directory", resource: "*", effect: "ask" },
+              ...whitelistedDirs.map(
+                (resource): PermissionV2.Rule => ({ action: "external_directory", resource, effect: "allow" }),
+              ),
+              { action: "read", resource: "*", effect: "allow" },
+              { action: "read", resource: "*.env", effect: "ask" },
+              { action: "read", resource: "*.env.*", effect: "ask" },
+              { action: "read", resource: "*.env.example", effect: "allow" },
+              { action: "list", resource: "*", effect: "allow" },
+              { action: "glob", resource: "*", effect: "allow" },
+              { action: "grep", resource: "*", effect: "allow" },
+              { action: "webfetch", resource: "*", effect: "allow" },
+              { action: "websearch", resource: "*", effect: "allow" },
+              { action: "bash", resource: "*", effect: "ask" },
+              { action: "edit", resource: "*", effect: "deny" },
+              { action: "task", resource: "*", effect: "deny" },
+              { action: "group", resource: "*", effect: "deny" },
+              { action: "todowrite", resource: "*", effect: "deny" },
+            ],
+          ),
         )
       })
 

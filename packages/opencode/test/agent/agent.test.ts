@@ -50,8 +50,11 @@ it.instance("returns default native agents when no config", () =>
     const names = agents.map((a) => a.name)
     expect(names).toContain("build")
     expect(names).toContain("plan")
+    expect(names).toContain("orchestrate")
     expect(names).toContain("general")
     expect(names).toContain("explore")
+    expect(names).toContain("planner")
+    expect(names).toContain("coder")
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
@@ -65,7 +68,197 @@ it.instance("build agent has correct default properties", () =>
     expect(build?.mode).toBe("primary")
     expect(build?.native).toBe(true)
     expect(evalPerm(build, "edit")).toBe("allow")
-    expect(evalPerm(build, "bash")).toBe("allow")
+    expect(evalPerm(build, "read")).toBe("allow")
+    expect(evalPerm(build, "group")).toBe("allow")
+    expect(evalPerm(build, "task")).toBe("allow")
+    expect(evalPerm(build, "glob")).toBe("allow")
+    expect(evalPerm(build, "grep")).toBe("allow")
+    expect(evalPerm(build, "bash")).toBe("deny")
+    expect(evalPerm(build, "question")).toBe("deny")
+    expect(evalPerm(build, "skill")).toBe("deny")
+    expect(evalPerm(build, "todowrite")).toBe("deny")
+    expect(evalPerm(build, "webfetch")).toBe("deny")
+    expect(evalPerm(build, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("orchestrate agent has grouped-subagent permissions", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    expect(orchestrate).toBeDefined()
+    expect(orchestrate?.mode).toBe("primary")
+    expect(orchestrate?.native).toBe(true)
+    expect(orchestrate?.description).toBe("Orchestrate mode. Decomposes large goals into grouped parallel subagent work.")
+    expect(orchestrate?.prompt).toContain("You are the Orchestrate agent")
+    expect(evalPerm(orchestrate, "question")).toBe("allow")
+    expect(evalPerm(orchestrate, "group")).toBe("allow")
+    expect(evalPerm(orchestrate, "task")).toBe("allow")
+    expect(Permission.evaluate("task", "general", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "explore", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "scout", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "planner", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "coder", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("skill", "interface", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("skill", "customize-opencode", orchestrate!.permission).action).toBe("deny")
+    expect(evalPerm(orchestrate, "edit")).toBe("allow")
+    expect(evalPerm(orchestrate, "read")).toBe("allow")
+    expect(evalPerm(orchestrate, "glob")).toBe("allow")
+    expect(evalPerm(orchestrate, "grep")).toBe("allow")
+    expect(evalPerm(orchestrate, "bash")).toBe("deny")
+    expect(evalPerm(orchestrate, "skill")).toBe("deny")
+    expect(evalPerm(orchestrate, "todowrite")).toBe("deny")
+    expect(evalPerm(orchestrate, "webfetch")).toBe("deny")
+    expect(evalPerm(orchestrate, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("coder agent is an implementation subagent without recursive delegation", () =>
+  Effect.gen(function* () {
+    const coder = yield* load((svc) => svc.get("coder"))
+    expect(coder).toBeDefined()
+    expect(coder?.mode).toBe("subagent")
+    expect(coder?.native).toBe(true)
+    expect(coder?.description).toBe("Implementation subagent for scoped, high-quality coding work.")
+    expect(coder?.prompt).toContain("You are the Coder subagent")
+    expect(evalPerm(coder, "read")).toBe("allow")
+    expect(Permission.evaluate("read", "secrets.env", coder!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.local", coder!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.example", coder!.permission).action).toBe("allow")
+    expect(evalPerm(coder, "list")).toBe("allow")
+    expect(evalPerm(coder, "glob")).toBe("allow")
+    expect(evalPerm(coder, "grep")).toBe("allow")
+    expect(evalPerm(coder, "edit")).toBe("allow")
+    expect(evalPerm(coder, "bash")).toBe("ask")
+    expect(evalPerm(coder, "question")).toBe("deny")
+    expect(evalPerm(coder, "task")).toBe("deny")
+    expect(evalPerm(coder, "group")).toBe("deny")
+    expect(evalPerm(coder, "todowrite")).toBe("deny")
+    expect(evalPerm(coder, "webfetch")).toBe("deny")
+    expect(evalPerm(coder, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("planner agent is a read-only native planning subagent", () =>
+  Effect.gen(function* () {
+    const planner = yield* load((svc) => svc.get("planner"))
+    expect(planner).toBeDefined()
+    expect(planner?.mode).toBe("subagent")
+    expect(planner?.native).toBe(true)
+    expect(planner?.description).toBe(
+      "Creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel to compare approaches.",
+    )
+    expect(planner?.prompt).toContain("You are the Planner subagent")
+    expect(evalPerm(planner, "read")).toBe("allow")
+    expect(Permission.evaluate("read", "secrets.env", planner!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.local", planner!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.example", planner!.permission).action).toBe("allow")
+    expect(evalPerm(planner, "list")).toBe("allow")
+    expect(evalPerm(planner, "glob")).toBe("allow")
+    expect(evalPerm(planner, "grep")).toBe("allow")
+    expect(evalPerm(planner, "webfetch")).toBe("allow")
+    expect(evalPerm(planner, "websearch")).toBe("allow")
+    expect(evalPerm(planner, "bash")).toBe("ask")
+    expect(evalPerm(planner, "edit")).toBe("deny")
+    expect(evalPerm(planner, "write")).toBe("deny")
+    expect(evalPerm(planner, "apply_patch")).toBe("deny")
+    expect(evalPerm(planner, "task")).toBe("deny")
+    expect(evalPerm(planner, "group")).toBe("deny")
+    expect(evalPerm(planner, "todowrite")).toBe("deny")
+  }),
+)
+
+it.instance("orchestrate prompt documents grouped multi-plan workflow and question discipline", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const prompt = orchestrate?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("question tool")
+    expect(lower).toContain("group tool")
+    expect(lower).toContain("task calls")
+    expect(lower).toContain("multi-plan")
+    expect(lower).toContain("inspect the repository first")
+    expect(lower).toContain("ask targeted questions")
+    expect(lower).toContain("do not ask questions that can be answered by reading the repo")
+    expect(lower).toContain("one group call equals one logical bucket")
+    expect(lower).toContain("use multiple group calls in the same assistant message")
+    expect(lower).toContain("priority")
+    expect(lower).toContain("avoid having two subagents edit the same file")
+    expect(lower).toContain("after grouped results return")
+    expect(lower).toContain("for tiny edits")
+    expect(lower).toContain("if the repo appears empty or uninitialized")
+    expect(lower).toContain("fanout sizing protocol")
+    expect(lower).toContain("user prompt breadth")
+    expect(lower).toContain("potential difficulty")
+    expect(lower).toContain("codebase size")
+    expect(lower).toContain("independent workstreams")
+    expect(lower).toContain("failure blast radius")
+    expect(lower).toContain("use 2 planner tasks for medium tasks")
+    expect(lower).toContain("use 3 planner tasks for large tasks")
+    expect(lower).toContain("use 4 planner tasks")
+    expect(lower).toContain("distinct angle or independent workstream")
+    expect(lower).toContain("prefer 2-6 task calls")
+    expect(lower).toContain("implementation dispatch protocol")
+    expect(lower).toContain("assign each slice to a coder task")
+    expect(lower).toContain("use group to run independent coder tasks concurrently")
+    expect(lower).toContain("one coder per coherent ownership boundary")
+    expect(lower).toContain("interface or handoff readme path")
+    expect(lower).toContain("use the interface skill")
+    expect(lower).toContain("contract-first interface phase")
+    expect(lower).toContain("contract/interface files")
+    expect(lower).toContain("handoff readmes")
+    expect(lower).toContain("work-package map")
+    expect(lower).toContain("before launching multiple coder agents")
+    expect(lower).toContain("before coder dispatch")
+    expect(lower).toContain("treat interface contracts as source of truth")
+    expect(lower).toContain("what not to touch")
+    expect(lower).toContain("subagent_type\": \"coder")
+    expect(lower).toContain("subagent_type\": \"planner")
+  }),
+)
+
+it.instance("coder prompt requires scoped implementation quality and structured output", () =>
+  Effect.gen(function* () {
+    const coder = yield* load((svc) => svc.get("coder"))
+    const prompt = coder?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("interface or handoff readme")
+    expect(lower).toContain("read it first")
+    expect(lower).toContain("treat interface contracts as the source of truth")
+    expect(lower).toContain("implement the assigned contract")
+    expect(lower).toContain("avoid changing shared contracts unless explicitly told")
+    expect(lower).toContain("report a structured question to the orchestrator instead of silently inventing incompatible behavior")
+    expect(lower).toContain("assigned scope")
+    expect(lower).toContain("reusable, composable code")
+    expect(lower).toContain("clear boundaries between modules")
+    expect(lower).toContain("add or update tests")
+    expect(lower).toContain("questions_for_orchestrator")
+    expect(lower).toContain("<coder_result>")
+    expect(lower).toContain("<files_inspected>")
+    expect(lower).toContain("<files_changed>")
+    expect(lower).toContain("<implementation_notes>")
+    expect(lower).toContain("<quality_notes>")
+    expect(lower).toContain("<tests_run>")
+    expect(lower).toContain("<risks>")
+  }),
+)
+
+it.instance("planner prompt requires read-only structured single-plan output", () =>
+  Effect.gen(function* () {
+    const planner = yield* load((svc) => svc.get("planner"))
+    const prompt = planner?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("stay read-only")
+    expect(lower).toContain("produce exactly one plan")
+    expect(lower).toContain("inspect relevant project files")
+    expect(lower).toContain("repository is empty")
+    expect(lower).toContain("<plan>")
+    expect(lower).toContain("<repo_context>")
+    expect(lower).toContain("<implementation_phases>")
+    expect(lower).toContain("<verification_strategy>")
+    expect(lower).toContain("<open_questions>")
   }),
 )
 
@@ -282,6 +475,44 @@ it.instance(
 )
 
 it.instance(
+  "user permission overrides keep last-rule semantics for orchestrate and planner",
+  () =>
+    Effect.gen(function* () {
+      const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+      const planner = yield* load((svc) => svc.get("planner"))
+      expect(orchestrate).toBeDefined()
+      expect(planner).toBeDefined()
+
+      expect(evalPerm(orchestrate, "group")).toBe("deny")
+      expect(Permission.evaluate("task", "planner", orchestrate!.permission).action).toBe("deny")
+      expect(evalPerm(planner, "edit")).toBe("allow")
+      expect(evalPerm(planner, "task")).toBe("allow")
+      expect(evalPerm(planner, "group")).toBe("allow")
+    }),
+  {
+    config: {
+      agent: {
+        orchestrate: {
+          permission: {
+            group: "deny",
+            task: {
+              planner: "deny",
+            },
+          },
+        },
+        planner: {
+          permission: {
+            edit: "allow",
+            task: "allow",
+            group: "allow",
+          },
+        },
+      },
+    },
+  },
+)
+
+it.instance(
   "global permission config applies to all agents",
   () =>
     Effect.gen(function* () {
@@ -474,10 +705,10 @@ it.instance("default permission includes doom_loop and external_directory as ask
   }),
 )
 
-it.instance("webfetch is allowed by default", () =>
+it.instance("webfetch is denied by default", () =>
   Effect.gen(function* () {
     const build = yield* load((svc) => svc.get("build"))
-    expect(evalPerm(build, "webfetch")).toBe("allow")
+    expect(evalPerm(build, "webfetch")).toBe("deny")
   }),
 )
 
@@ -676,6 +907,20 @@ it.instance(
 )
 
 it.instance(
+  "defaultAgent respects default_agent config set to orchestrate",
+  () =>
+    Effect.gen(function* () {
+      const agent = yield* load((svc) => svc.defaultAgent())
+      expect(agent).toBe("orchestrate")
+    }),
+  {
+    config: {
+      default_agent: "orchestrate",
+    },
+  },
+)
+
+it.instance(
   "defaultAgent respects default_agent config set to custom agent with mode all",
   () =>
     Effect.gen(function* () {
@@ -700,6 +945,26 @@ it.instance(
   {
     config: {
       default_agent: "explore",
+    },
+  },
+)
+
+it.instance(
+  "defaultAgent throws when default_agent points to planner subagent",
+  () => expectDefaultAgentError('default agent "planner" is a subagent'),
+  {
+    config: {
+      default_agent: "planner",
+    },
+  },
+)
+
+it.instance(
+  "defaultAgent throws when default_agent points to coder subagent",
+  () => expectDefaultAgentError('default agent "coder" is a subagent'),
+  {
+    config: {
+      default_agent: "coder",
     },
   },
 )
@@ -749,6 +1014,7 @@ it.instance(
       agent: {
         build: { disable: true },
         plan: { disable: true },
+        orchestrate: { disable: true },
       },
     },
   },

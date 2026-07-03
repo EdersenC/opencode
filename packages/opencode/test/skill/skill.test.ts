@@ -64,6 +64,30 @@ const withHome = <A, E, R>(home: string, self: Effect.Effect<A, E, R>) =>
   )
 
 describe("skill", () => {
+  it.live("registers built-in customize-opencode and interface skills", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const builtins = (yield* skill.all()).filter((item) => item.location === "<built-in>")
+          const names = builtins.map((item) => item.name).toSorted()
+          const interfaceSkill = yield* skill.require("interface")
+
+          expect(names).toContain("customize-opencode")
+          expect(names).toContain("interface")
+          expect(interfaceSkill.description).toContain("contract-first interfaces")
+          expect(interfaceSkill.content).toContain("# Interface Skill")
+          expect(interfaceSkill.content).toContain("contract-first interfaces")
+          expect(interfaceSkill.content).toContain("handoff README")
+          expect(interfaceSkill.content).toContain("work-package map")
+          expect(interfaceSkill.content).toContain("Interface Contracts")
+          expect(interfaceSkill.content).toContain("Coder Dispatch Prompts")
+          expect(interfaceSkill.content).toContain("Parallel Versus Sequential Guidance")
+        }),
+      { git: true },
+    ),
+  )
+
   it.effect("formats verbose locations as XML-safe filesystem paths", () =>
     Effect.sync(() => {
       const output = Skill.fmt(

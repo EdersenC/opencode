@@ -116,16 +116,35 @@ describe("AgentV2", () => {
       const agents = yield* agent.all()
       expect(agents.map((item) => String(item.id)).sort()).toEqual([
         "build",
+        "coder",
         "compaction",
         "explore",
         "general",
+        "orchestrate",
         "plan",
+        "planner",
         "summary",
         "title",
       ])
-      for (const item of agents) {
+      for (const item of agents.filter((item) => !["coder", "planner"].includes(String(item.id)))) {
         expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
       }
+
+      const orchestrate = yield* agent.get(AgentV2.ID.make("orchestrate"))
+      expect(orchestrate?.mode).toBe("primary")
+      expect(orchestrate?.system).toContain("interface skill")
+      expect(orchestrate?.system).toContain("before coder dispatch")
+      expect(orchestrate?.system).toContain("multiple coder agents")
+      expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "*", effect: "deny" })
+      expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "interface", effect: "allow" })
+
+      const coder = yield* agent.get(AgentV2.ID.make("coder"))
+      expect(coder?.mode).toBe("subagent")
+      expect(coder?.system).toContain("Treat interface contracts as the source of truth")
+      expect(coder?.system).toContain("Do not change shared contracts unless explicitly told")
+
+      const planner = yield* agent.get(AgentV2.ID.make("planner"))
+      expect(planner?.mode).toBe("subagent")
     }),
   )
 })

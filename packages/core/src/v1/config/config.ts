@@ -86,7 +86,12 @@ export const Info = Schema.Struct({
   }),
   mode: Schema.optional(
     Schema.StructWithRest(
-      Schema.Struct({ build: Schema.optional(ConfigAgentV1.Info), plan: Schema.optional(ConfigAgentV1.Info) }),
+      Schema.Struct({
+        build: Schema.optional(ConfigAgentV1.Info),
+        plan: Schema.optional(ConfigAgentV1.Info),
+        orchestrate: Schema.optional(ConfigAgentV1.Info),
+        planner: Schema.optional(ConfigAgentV1.Info),
+      }),
       [Schema.Record(Schema.String, ConfigAgentV1.Info)],
     ),
   ).annotate({ description: "@deprecated Use `agent` field instead." }),
@@ -95,6 +100,8 @@ export const Info = Schema.Struct({
       Schema.Struct({
         plan: Schema.optional(ConfigAgentV1.Info),
         build: Schema.optional(ConfigAgentV1.Info),
+        orchestrate: Schema.optional(ConfigAgentV1.Info),
+        planner: Schema.optional(ConfigAgentV1.Info),
         general: Schema.optional(ConfigAgentV1.Info),
         explore: Schema.optional(ConfigAgentV1.Info),
         title: Schema.optional(ConfigAgentV1.Info),

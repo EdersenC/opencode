@@ -1,0 +1,69 @@
+Group multiple task subagent calls into one logical result.
+
+Use group when several subtasks are part of one goal and the caller should receive one combined grouped result after every inner task finishes.
+
+Usage notes:
+1. One group tool call represents one group.
+2. To run multiple groups concurrently, call group multiple times in the same assistant message.
+3. Each group waits for all of its inner calls before returning.
+4. Use priority only to break ties among groups that complete at essentially the same time.
+5. Do not use group for unrelated work that should return independently unless you are intentionally creating separate grouped results.
+6. v1 supports nested task calls only.
+7. Inner task calls run concurrently. Do not duplicate that work yourself.
+8. Inner background tasks are not supported because group waits for foreground completion.
+9. fail_fast is accepted for forward compatibility, but v1 returns all settled nested results because stopping sibling task calls early without changing task/session cleanup could lose result and cancellation accounting.
+
+Example input:
+
+{
+  "name": "implement-xyz-feature",
+  "description": "Two agents implement separate parts of the XYZ feature and return one combined result.",
+  "priority": "high",
+  "calls": [
+    {
+      "tool": "task",
+      "name": "xyz-interface",
+      "description": "Implement the public interface for XYZ.",
+      "input": {
+        "description": "Implement XYZ interface",
+        "subagent_type": "general",
+        "prompt": "Implement the public TypeScript interface for XYZ. Keep the implementation minimal and type-safe. Return files changed, important decisions, and remaining risks."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "xyz-runtime",
+      "description": "Implement the runtime behavior for XYZ.",
+      "input": {
+        "description": "Implement XYZ runtime",
+        "subagent_type": "general",
+        "prompt": "Implement the runtime behavior for XYZ using the interface created by the other task. Return files changed, important decisions, and remaining risks."
+      }
+    }
+  ]
+}
+
+Example with two independent groups:
+The assistant should emit two group tool calls in the same assistant message.
+
+Tool call 1:
+{
+  "name": "feature-implementation",
+  "description": "Agents implement feature XYZ.",
+  "priority": "high",
+  "calls": [...]
+}
+
+Tool call 2:
+{
+  "name": "branch-review",
+  "description": "Agents review the branch, merge conflicts, and code quality.",
+  "priority": "medium",
+  "calls": [...]
+}
+
+Expected behavior:
+- Group 1 returns when all implementation subtasks finish.
+- Group 2 returns when all review subtasks finish.
+- Whichever group finishes first is available first.
+- If both complete in the same batch and ordering can be safely controlled, high priority comes before medium priority.
