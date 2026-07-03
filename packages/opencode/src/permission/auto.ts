@@ -218,14 +218,6 @@ export function canAutoDenyRequest(input: PermissionLike) {
   return autoRequestDecision(input)?.decision === "deny"
 }
 
-export function canAutoApprove(input: PermissionLike) {
-  return autoDecision(input)?.decision === "allow"
-}
-
-export function canAutoDeny(input: PermissionLike) {
-  return autoDecision(input)?.decision === "deny"
-}
-
 function denyRule(command: string) {
   if (FORK_BOMB.test(command)) return { reason: "obvious fork bomb", rule: "fork-bomb" }
   if (DESTRUCTIVE_ROOT.test(command)) return { reason: "destructive deletion outside project root", rule: "rm-root-home" }
