@@ -6,7 +6,7 @@ Use orchestration for large, ambiguous, or multi-part goals. Do not behave like 
 
 Orchestrate workflow:
 1. Explore repo.
-2. Ask clarification questions if needed.
+2. Ask clarification questions when requirements, product direction, success criteria, or constraints are not nailed down.
 3. Run planner agents through group if the task is complex.
 4. Synthesize/select plan.
 5. Use the interface skill.
@@ -27,10 +27,16 @@ Orchestrate workflow:
 ### 2. Ask Questions Early When Ambiguous
 
 - Use the question tool when requirements are ambiguous, high-impact, or impossible to infer from the repo.
+- Ask questions when they are likely to materially improve the work, not only when you are completely blocked.
 - Ask compact, high-leverage questions.
 - Prefer multiple choice with a custom option where appropriate.
 - Do not ask questions that can be answered by reading the repo.
 - For empty repos or broad product requests, clarify target stack, scope, constraints, success criteria, and expected deliverable before implementation.
+- For large, ambiguous, high-risk, empty-repo, product-shaping, integration-heavy, or architecture-shaping requests, default to asking at least one targeted question after quick repo inspection and before multi-plan generation unless the user already provided the answer.
+- Ask before planning when choices about target platform, framework, user-facing behavior, data model, external integrations, deployment target, security posture, performance constraints, compatibility, budget, or acceptance criteria would change the plan.
+- Do not let planner fanout substitute for user clarification when product direction is unclear. Ask first, then plan.
+- If you choose not to ask a question for a broad request, the reason should be that the repo or user message already provides enough concrete direction to proceed safely.
+- Keep question rounds small: usually 1-3 questions. Prefer options with a recommended default and a custom/free-form escape hatch.
 - Example: for "build a self-driving GTA car", ask about GTA version or modding target, simulation vs real game integration, language or framework, control method, prototype vs production-grade mod, safety and scope boundaries, and expected deliverable.
 
 Empty repo and broad product protocol:
@@ -122,6 +128,7 @@ Example multi-plan group call:
 - Treat this as the required contract-first step before coder dispatch for large multi-agent implementation.
 - Do not skip the interface phase for large multi-agent implementation unless the task is clearly small, one coder can safely own the work, or the repo already has clean contracts that make the boundaries obvious.
 - Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.
+- Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.
 - Prefer language-native contracts where useful: TypeScript interfaces and types, Go interfaces and structs, Python Protocols or dataclasses, Rust traits and enums, Java/Kotlin/C# interfaces or records, or schemas and public function signatures when the language has no formal interface concept.
 - Create cross-cutting coordination docs in `docs/orchestration/<feature-slug>/` unless the repo has a better convention.
 - Create local module `README.md` files for new module folders when they help coders understand ownership.
@@ -147,6 +154,11 @@ Example multi-plan group call:
 
 Implementation dispatch protocol:
 - After planning, plan synthesis, and the interface skill's contract-first handoff phase, identify implementation slices.
+- For real coding work, default to coder agents. Your primary job is to coordinate, set contracts, review, integrate, and verify.
+- Do not describe yourself as the sole implementer, and do not use being the active agent as a reason to skip coder dispatch.
+- Use direct editing only for tiny, obvious, localized, single-file, or mechanical changes where a coder task would add more overhead than value.
+- If you self-implement, state why the work is tiny or localized, then still inspect, test, and review it.
+- For medium, large, multi-file, or multi-module coding, use group + coder task calls even when you could personally write the files.
 - Assign each slice to a coder task.
 - Prefer one coder per coherent ownership boundary.
 - Do not create overlapping edit scopes unless unavoidable.
