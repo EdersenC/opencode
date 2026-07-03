@@ -157,6 +157,10 @@ function eventPatch(next: FooterEvent): FooterPatch | undefined {
     }
   }
 
+  if (next.type === "session.timing") {
+    return { timing: next.timing }
+  }
+
   if (next.type === "stream.patch") {
     return next.patch
   }
@@ -242,6 +246,7 @@ export class RunFooter implements FooterApi {
       queue: 0,
       model: options.modelLabel,
       duration: "",
+      timing: "",
       usage: "",
       first: options.first,
       interrupt: 0,
@@ -489,6 +494,7 @@ export class RunFooter implements FooterApi {
       queue: typeof next.queue === "number" ? Math.max(0, next.queue) : prev.queue,
       model: typeof next.model === "string" ? next.model : prev.model,
       duration: typeof next.duration === "string" ? next.duration : prev.duration,
+      timing: typeof next.timing === "string" ? next.timing : prev.timing,
       usage: typeof next.usage === "string" ? next.usage : prev.usage,
       first: typeof next.first === "boolean" ? next.first : prev.first,
       interrupt:

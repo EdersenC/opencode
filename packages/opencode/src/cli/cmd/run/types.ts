@@ -87,6 +87,7 @@ export type FooterState = {
   queue: number
   model: string
   duration: string
+  timing: string
   usage: string
   first: boolean
   interrupt: number
@@ -267,6 +268,10 @@ export type FooterEvent =
   | {
       type: "turn.duration"
       duration: string
+    }
+  | {
+      type: "session.timing"
+      timing: string
     }
   | {
       type: "stream.patch"

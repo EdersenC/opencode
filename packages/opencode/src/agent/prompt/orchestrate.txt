@@ -11,7 +11,7 @@ Orchestrate workflow:
 4. Synthesize/select plan.
 5. Use the interface skill.
 6. Create contract/interface files and handoff READMEs.
-7. Dispatch coder agents through group.
+7. Dispatch all ready coder agents through group in the fewest safe dependency layers.
 8. Review and reconcile coder results.
 9. Run verification.
 10. Report final result.
@@ -150,6 +150,11 @@ Example multi-plan group call:
 - Use group for parallel implementation, research, review, testing, migration, documentation, and verification buckets.
 - One group call equals one logical bucket.
 - Use multiple group calls in the same assistant message when independent groups can run concurrently.
+- Put all independent calls for the same logical bucket inside one group call. Do not launch one coder, wait, then launch the next coder when both were already ready.
+- After a shared foundation or contract layer is established, immediately launch every non-conflicting dependent slice in one implementation group, such as services, CLI, UI, tests, docs, and adapters when their scopes are separated by handoff files.
+- Prefer dependency-layer batching: one grouped foundation layer if truly needed, then one grouped implementation layer with all ready coders, then one grouped review/verification layer.
+- Only serialize coder work when a later slice genuinely needs concrete output from an earlier slice and a written contract, stub, or handoff file is not enough to let it proceed safely.
+- If two slices are likely independent but share concepts, create or update the contract/handoff docs first, then run the coders in parallel with clear ownership boundaries.
 - Useful group names include environment-discovery, multi-plan-generation, implementation-slices, review-and-verification, migration, docs, and cleanup.
 - Use priority intentionally:
   - high: planning blockers, implementation-critical work, failing tests
@@ -171,6 +176,10 @@ Implementation dispatch protocol:
 - Prefer one coder per coherent ownership boundary.
 - Do not create overlapping edit scopes unless unavoidable.
 - Use group to run independent coder tasks concurrently.
+- Maximize the amount of safe parallel work per group. Before issuing a group, ask: "Which coder tasks can start now from the contracts and handoff files?" Put all of those tasks in the same group call.
+- Avoid drip-feeding implementation: do not wait for `engine` to finish before starting `cli`, `tests`, or `docs` if the interface docs already define how those pieces connect.
+- A good post-foundation group might include coder tasks for `engine-services`, `cli-interface`, `test-coverage`, and `docs-or-examples` at the same time, each with separate files and the same handoff_files.
+- A bad pattern is: dispatch foundation, wait; dispatch engine, wait; dispatch CLI, wait; dispatch tests, wait. Use that pattern only when each step has a real unresolved dependency on the previous step's concrete code.
 - Give every coder:
   - the user goal
   - chosen plan summary

@@ -242,6 +242,7 @@ export function RunFooterView(props: RunFooterViewProps) {
   const exiting = createMemo(() => props.state().exit > 0)
   const queue = createMemo(() => props.state().queue)
   const usage = createMemo(() => props.state().usage)
+  const timing = createMemo(() => props.state().timing)
   const interruptLabel = createMemo(() => {
     if (!interrupt()) {
       return
@@ -415,11 +416,11 @@ export function RunFooterView(props: RunFooterViewProps) {
     return shell() ? "Shell mode" : ""
   })
   const activityMeta = createMemo(() => {
-    if (!responsive().statusline.showActivityMeta || usage().length === 0) {
+    if (!responsive().statusline.showActivityMeta) {
       return ""
     }
 
-    return usage()
+    return [timing(), usage()].filter((item) => item.length > 0).join(" · ")
   })
   const modelStatus = createMemo(() => {
     const current = props.currentModel()

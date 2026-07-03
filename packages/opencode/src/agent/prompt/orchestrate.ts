@@ -80,6 +80,8 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "If the repo size or architecture is unknown, first map it directly or with an environment-discovery group, then choose the planner count.",
       "When executing implementation after planning, size each group by independent non-conflicting workstreams. Prefer 2-6 task calls for real parallel implementation, review, migration, docs, or tests; stay lower when files overlap heavily.",
       "Tight coupling is a reason to sequence coder work or assign one larger coherent slice, not a reason to abandon coder dispatch for medium or large coding work.",
+      "Maximize the amount of safe parallel work per group. After contracts exist, ask which coder tasks can start now and put all ready non-conflicting tasks in the same group call.",
+      "Prefer dependency-layer batching: one grouped foundation layer if truly needed, then one grouped implementation layer with all ready coders, then one grouped review and verification layer.",
     ])
     .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
@@ -105,6 +107,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use group for parallel implementation, research, review, testing, migration, documentation, and verification buckets.",
       "One group call equals one logical bucket.",
       "Use multiple group calls in the same assistant message when independent groups can run concurrently.",
+      "Put all independent calls for the same logical bucket inside one group call. Do not launch one coder, wait, then launch the next coder when both were already ready.",
+      "After a shared foundation or contract layer is established, immediately launch every non-conflicting dependent slice in one implementation group, such as services, CLI, UI, tests, docs, and adapters when their scopes are separated by handoff files.",
+      "Only serialize coder work when a later slice genuinely needs concrete output from an earlier slice and a written contract, stub, or handoff file is not enough to let it proceed safely.",
       "Useful group names include environment-discovery, multi-plan-generation, implementation-slices, review-and-verification, migration, docs, and cleanup.",
       "Use priority intentionally: high for planning blockers, implementation-critical work, and failing tests; medium for normal implementation and review; low for docs, cleanup, and nice-to-have analysis.",
     ])
@@ -123,6 +128,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Prefer one coder per coherent ownership boundary.",
       "Do not create overlapping edit scopes unless unavoidable.",
       "Use group to run independent coder tasks concurrently.",
+      "Avoid drip-feeding implementation: do not wait for engine to finish before starting CLI, tests, docs, or adapters if the interface docs already define how those pieces connect.",
+      "A good post-foundation group might include coder tasks for engine-services, cli-interface, test-coverage, and docs-or-examples at the same time, each with separate files and the same handoff_files.",
+      "A bad pattern is: dispatch foundation, wait; dispatch engine, wait; dispatch CLI, wait; dispatch tests, wait. Use that pattern only when each step has a real unresolved dependency on the previous step's concrete code.",
     ])
     .context("Coder Handoff Requirements", [
       "Give every coder the user goal, chosen plan summary, exact scope, directories or files, public contract files to implement or respect, expected outputs, constraints, test expectations, what not to touch, and how to report questions or blockers.",
