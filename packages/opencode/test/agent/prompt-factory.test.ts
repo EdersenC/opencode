@@ -34,6 +34,8 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("construct the widest safe ready-now batch")
     expect(lower).toContain("maintain a pending-slices list")
     expect(lower).toContain("treat user wait time as a resource")
+    expect(lower).toContain("serial coder drip-feeding is a dispatch failure")
+    expect(lower).toContain("do not split foundation -> engine -> cli -> tests into four user waits")
     expect(lower).toContain("do not announce parallel implementation")
     expect(lower).toContain("engine, cli, tests, docs, adapters, or ui")
     expect(lower).toContain("do not make the user watch avoidable serial phases")

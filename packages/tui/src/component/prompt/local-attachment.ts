@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
 export type LocalFiles = Readonly<{
   readText(path: string): Promise<string>
@@ -22,6 +23,23 @@ export function readLocalAttachment(file: string) {
   )
 }
 
+const WINDOWS_DRIVE_PATH = /^([A-Za-z]):[\\/](.*)$/
+const FILE_URL_WINDOWS_DRIVE_PATH = /^\/([A-Za-z]):[\\/](.*)$/
+
+export function normalizePastedFilepath(value: string, platform: string) {
+  const raw = value.replace(/^['"]+|['"]+$/g, "")
+  const filePath = raw.startsWith("file://") ? localFileURLToPath(raw) : raw
+  if (platform === "win32") return filePath
+
+  const fileURLWindows = filePath.match(FILE_URL_WINDOWS_DRIVE_PATH)
+  if (fileURLWindows) return windowsPathToWslPath(fileURLWindows[1], fileURLWindows[2])
+
+  const windows = filePath.match(WINDOWS_DRIVE_PATH)
+  if (windows) return windowsPathToWslPath(windows[1], windows[2])
+
+  return filePath.replace(/\\(.)/g, "$1")
+}
+
 const mimeTypes: Record<string, string> = {
   ".avif": "image/avif",
   ".gif": "image/gif",
@@ -31,6 +49,18 @@ const mimeTypes: Record<string, string> = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+}
+
+function localFileURLToPath(value: string) {
+  try {
+    return fileURLToPath(value)
+  } catch {
+    return value
+  }
+}
+
+function windowsPathToWslPath(drive: string, rest: string) {
+  return `/mnt/${drive.toLowerCase()}/${rest.replaceAll("\\", "/")}`
 }
 
 export async function readLocalAttachmentWith(files: LocalFiles, path: string): Promise<LocalAttachment | undefined> {

@@ -88,6 +88,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "If you launch only one coder while other ready slices exist, you should have a concrete dependency reason, not just a feeling that one phase comes first.",
     ])
     .workflow("Parallel Dispatch Audit", [
+      "Serial coder drip-feeding is a dispatch failure for medium or large work unless you can name the concrete dependency that makes every deferred coder unsafe to start.",
+      "After any foundation, contract, or interface task completes, your next implementation action should be the widest safe group of all now-ready coders, not one coder followed by another one-coder phase.",
+      "If the user could reasonably ask 'why did you not put those coder tasks in the same group?', you should have grouped them.",
       "Before every coder task or implementation group, run a parallel dispatch audit in your own reasoning.",
       "Classify each possible implementation slice as ready-now, blocked-by-dependency, or not-worth-a-subagent.",
       "A slice is ready-now when it has enough contract, handoff, stub, fixture, type, schema, or public behavior detail to make useful progress without waiting for sibling code.",
@@ -96,6 +99,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "If ready-now contains one coder slice and blocked-by-dependency contains named later slices, state the concrete dependency reason before or inside the group description.",
       "Do not announce parallel implementation unless the next tool action contains multiple nested coder task calls in one group call, or multiple independent group calls in the same assistant message.",
       "Do not announce Phase 2 as parallel and then call only engine, then later call CLI. If CLI can implement against the same contracts, CLI belongs in the same group as engine.",
+      "Do not split foundation -> engine -> CLI -> tests into four user waits when foundation has produced enough contracts or handoff files for engine, CLI, and tests to proceed together.",
       "Treat user wait time as a resource. Prefer one wider ready batch over several avoidable serial waits.",
       "Use descriptive group and call names because the UI shows them while work is running.",
       "Keep user-facing progress short: say what batch is running, why anything is waiting, and what you will verify after results return.",
@@ -107,6 +111,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "If two or more coder slices are ready-now, your next tool action should normally be one group call containing those coder slices.",
       "If only one coder slice is ready-now, prefer a direct task call unless you need group metadata, blocked-result handling, or the slice is part of a larger grouped result.",
       "If you emit a group with only one nested coder task, mention the concrete dependency that prevents the other expected slices from joining that batch.",
+      "After saying 'Foundation is done', do not dispatch only engine if CLI, tests, docs, adapters, or UI can use the same handoff_files. Launch them together.",
       "Use contracts, stubs, schemas, fixtures, and handoff files to make dependent work parallel-ready when that is safe.",
       "After a foundation or shared-contract coder returns, reclassify every deferred slice once, then launch the widest safe follow-up group.",
       "Do not defer CLI, tests, docs, examples, adapters, or UI just because the engine is still being written if those slices can code to the same public contract.",

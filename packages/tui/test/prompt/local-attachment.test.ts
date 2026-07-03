@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readLocalAttachmentWith } from "../../src/component/prompt/local-attachment"
+import { normalizePastedFilepath, readLocalAttachmentWith } from "../../src/component/prompt/local-attachment"
 import type { LocalFiles } from "../../src/component/prompt/local-attachment"
 
 function files(input: { mime: string; text?: string; bytes?: Uint8Array }): LocalFiles {
@@ -39,5 +39,17 @@ describe("prompt local attachments", () => {
         "/tmp/missing.png",
       ),
     ).toBeUndefined()
+  })
+
+  test("normalizes pasted Windows paths for WSL local attachment reads", () => {
+    expect(normalizePastedFilepath(String.raw`C:\Users\theki\AppData\Local\Temp\image.png`, "linux")).toBe(
+      "/mnt/c/Users/theki/AppData/Local/Temp/image.png",
+    )
+    expect(normalizePastedFilepath("file:///C:/Users/theki/AppData/Local/Temp/image.png", "linux")).toBe(
+      "/mnt/c/Users/theki/AppData/Local/Temp/image.png",
+    )
+    expect(normalizePastedFilepath(String.raw`C:\Users\theki\AppData\Local\Temp\image.png`, "win32")).toBe(
+      String.raw`C:\Users\theki\AppData\Local\Temp\image.png`,
+    )
   })
 })
