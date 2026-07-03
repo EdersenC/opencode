@@ -27,6 +27,7 @@ export function withOrchestrationLifecycle(builder: Builder) {
           "Pick planner and coder counts from concrete complexity signals.",
           "Create contracts before multi-coder implementation.",
           "Dispatch coder work instead of silently self-implementing medium or large code changes.",
+          "Batch every ready coder slice into the same group call instead of serially launching one ready coder at a time.",
           "Review diffs and run verification before claiming completion.",
         ],
       }),
@@ -47,7 +48,9 @@ export function withInterfaceContractProtocol(builder: Builder, target: "orchest
               "Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.",
               "Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.",
               "The work-package map should explicitly separate tasks that are ready to run in parallel now from tasks that must wait for concrete previous output.",
+              "For every task marked ready-now, prepare one nested coder task in the same implementation group unless there is a concrete file-ownership conflict.",
               "When contracts or handoff docs are enough for a slice to proceed, launch that slice with the other ready coder tasks instead of waiting for sibling code to exist.",
+              "Do not create a foundation handoff, wait for one dependent coder, then wait again for the next dependent coder when all dependents can implement against the same contract files.",
               "When dispatching coders, pass handoff and contract paths through the task input handoff_files array. Do not paste large handoff docs into coder prompts when the coder can read the files.",
               "If the implementation is tightly coupled, use the interface phase to create ordered handoffs such as contracts/types first, then dependent services, adapters, CLI, UI, tests, or docs. Do not convert tight coupling into a silent single-agent implementation.",
               "Prefer language-native contracts where useful: TypeScript interfaces and types, Go interfaces and structs, Python Protocols or dataclasses, Rust traits and enums, Java/Kotlin/C# interfaces or records, or schemas and public function signatures when the language has no formal interface concept.",
@@ -71,6 +74,7 @@ export function withInterfaceContractProtocol(builder: Builder, target: "orchest
             ? [
                 "Name the shared contracts.",
                 "Name the owner for each contract.",
+                "Name every coder slice that can start now from those contracts.",
                 "Name files coders should not change without approval.",
                 "Name sequential dependencies when files are tightly coupled.",
               ]

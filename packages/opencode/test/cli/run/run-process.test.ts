@@ -6,7 +6,7 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
-import { cliIt } from "../../lib/cli-process"
+import { cliIt, testDeepSeekModelID } from "../../lib/cli-process"
 
 describe("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
@@ -19,6 +19,21 @@ describe("opencode run (non-interactive subprocess)", () => {
         const result = yield* opencode.run("say hi")
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("hello from the test llm\n")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "runs with a DeepSeek V4 Flash Free mock model",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("deepseek mock ok")
+
+        const result = yield* opencode.run("say hi with deepseek", { model: testDeepSeekModelID })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("deepseek mock ok\n")
+        expect((yield* llm.inputs).map((input) => input.model)).toContain("deepseek-v4-flash-free")
       }),
     60_000,
   )
@@ -47,12 +62,12 @@ describe("opencode run (non-interactive subprocess)", () => {
 
   cliIt.concurrent(
     "--permission-mode auto auto-approves project-local bash",
-    ({ llm, opencode }) =>
+    ({ home, llm, opencode }) =>
       Effect.gen(function* () {
         yield* llm.push(
           reply().tool("bash", {
-            command: "printf auto-mode",
-            description: "Print deterministic output",
+            command: "printf auto-mode > auto-mode-marker",
+            description: "Write deterministic project-local output",
           }),
         )
         yield* llm.text("auto done")
@@ -64,18 +79,19 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("auto done\n")
         expect(result.stderr).not.toContain("permission requested")
+        expect(yield* Effect.promise(() => Bun.file(`${home}/auto-mode-marker`).text())).toBe("auto-mode")
       }),
     60_000,
   )
 
   cliIt.concurrent(
     "--auto aliases auto permission mode",
-    ({ llm, opencode }) =>
+    ({ home, llm, opencode }) =>
       Effect.gen(function* () {
         yield* llm.push(
           reply().tool("bash", {
-            command: "printf auto-alias",
-            description: "Print deterministic output",
+            command: "printf auto-alias > auto-alias-marker",
+            description: "Write deterministic project-local output",
           }),
         )
         yield* llm.text("alias done")
@@ -87,6 +103,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("alias done\n")
         expect(result.stderr).not.toContain("permission requested")
+        expect(yield* Effect.promise(() => Bun.file(`${home}/auto-alias-marker`).text())).toBe("auto-alias")
       }),
     60_000,
   )
@@ -282,7 +299,10 @@ describe("opencode run (non-interactive subprocess)", () => {
           }),
         )
         yield* llm.fail("provider failed")
-        const result = yield* opencode.run("fail after output", { format: "json" })
+        const result = yield* opencode.run("fail after output", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
 
         const events = opencode.parseJsonEvents(result.stdout)
         expect(result.exitCode).toBe(0)
@@ -295,7 +315,15 @@ describe("opencode run (non-interactive subprocess)", () => {
           "step_finish",
         ])
         expect(events[1]?.part).toEqual(expect.objectContaining({ type: "text", text: "partial json" }))
+        expect(events[2]?.part).toEqual(
+          expect.objectContaining({
+            type: "tool",
+            tool: "bash",
+            state: expect.objectContaining({ status: "completed" }),
+          }),
+        )
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "unknown" }))
+        expect(events.some((event) => event.type === "error")).toBe(false)
       }),
     60_000,
   )

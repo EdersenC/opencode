@@ -721,6 +721,28 @@ export const RunCommand = effectCmd({
           return false
         }
 
+        const jsonParts = new Map<
+          string,
+          {
+            type: "reasoning" | "text" | "tool_use"
+            part: Record<string, unknown>
+          }
+        >()
+
+        function bufferJsonPart(type: "reasoning" | "text" | "tool_use", part: Record<string, unknown>) {
+          if (typeof part.id !== "string") return true
+          jsonParts.set(part.id, { type, part })
+          return true
+        }
+
+        function flushJsonParts() {
+          if (args.format !== "json" || jsonParts.size === 0) return
+          for (const item of [...jsonParts.values()].sort((a, b) => String(a.part.id).localeCompare(String(b.part.id)))) {
+            emit(item.type, { part: item.part })
+          }
+          jsonParts.clear()
+        }
+
         // Consume one subscribed event stream for the active session and mirror it
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
@@ -749,7 +771,10 @@ export const RunCommand = effectCmd({
               if (part.sessionID !== sessionID) continue
 
               if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
-                if (emit("tool_use", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("tool_use", part as Record<string, unknown>)
+                  continue
+                }
                 if (part.state.status === "completed") {
                   await tool(part)
                   continue
@@ -770,15 +795,20 @@ export const RunCommand = effectCmd({
               }
 
               if (part.type === "step-start") {
+                flushJsonParts()
                 if (emit("step_start", { part })) continue
               }
 
               if (part.type === "step-finish") {
+                flushJsonParts()
                 if (emit("step_finish", { part })) continue
               }
 
               if (part.type === "text" && part.time?.end) {
-                if (emit("text", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("text", part as Record<string, unknown>)
+                  continue
+                }
                 const text = part.text.trim()
                 if (!text) continue
                 if (!process.stdout.isTTY) {
@@ -791,7 +821,10 @@ export const RunCommand = effectCmd({
               }
 
               if (part.type === "reasoning" && part.time?.end && thinking) {
-                if (emit("reasoning", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("reasoning", part as Record<string, unknown>)
+                  continue
+                }
                 const text = part.text.trim()
                 if (!text) continue
                 const line = `Thinking: ${text}`
@@ -813,6 +846,7 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
+              flushJsonParts()
               if (emit("error", { error: props.error })) continue
               UI.error(err)
             }

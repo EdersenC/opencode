@@ -82,7 +82,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Tight coupling is a reason to sequence coder work or assign one larger coherent slice, not a reason to abandon coder dispatch for medium or large coding work.",
       "Maximize the amount of safe parallel work per group. After contracts exist, ask which coder tasks can start now and put all ready non-conflicting tasks in the same group call.",
       "Prefer dependency-layer batching: one grouped foundation layer if truly needed, then one grouped implementation layer with all ready coders, then one grouped review and verification layer.",
+      "A group is not limited to one or two agents. If five distinct coder slices are ready and have non-overlapping ownership, launch five nested coder tasks in that one group.",
       "Do not make the user watch avoidable serial phases. If engine, CLI, tests, docs, adapters, or UI can all code against the same contracts, dispatch them together.",
+      "If you launch only one coder while other ready slices exist, you should have a concrete dependency reason, not just a feeling that one phase comes first.",
     ])
     .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
@@ -113,6 +115,8 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Put all independent calls for the same logical bucket inside one group call. Do not launch one coder, wait, then launch the next coder when both were already ready.",
       "After a shared foundation or contract layer is established, immediately launch every non-conflicting dependent slice in one implementation group, such as services, CLI, UI, tests, docs, and adapters when their scopes are separated by handoff files.",
       "Before issuing an implementation group, do a readiness batching check: list every coder task that can proceed from existing contracts and handoff files, then include all of them in the same group call.",
+      "Treat CLI, tests, examples, docs, adapters, and UI as parallel-ready when contracts define inputs, outputs, errors, and public behavior. They do not need to wait for engine code merely to start.",
+      "If a slice can use stubs, fixtures, types, schemas, or documented interfaces until sibling code lands, it is ready for the current group.",
       "Only serialize coder work when a later slice genuinely needs concrete output from an earlier slice and a written contract, stub, or handoff file is not enough to let it proceed safely.",
       "A contract-ready task should not wait for sibling code merely because the sibling happens to be lower in the dependency graph; it should code to the contract and report integration assumptions.",
       "Useful group names include environment-discovery, multi-plan-generation, implementation-slices, review-and-verification, migration, docs, and cleanup.",
@@ -137,6 +141,8 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Avoid drip-feeding implementation: do not wait for engine to finish before starting CLI, tests, docs, or adapters if the interface docs already define how those pieces connect.",
       "A good post-foundation group might include coder tasks for engine-services, cli-interface, test-coverage, and docs-or-examples at the same time, each with separate files and the same handoff_files.",
       "A bad pattern is: dispatch foundation, wait; dispatch engine, wait; dispatch CLI, wait; dispatch tests, wait. Use that pattern only when each step has a real unresolved dependency on the previous step's concrete code.",
+      "Do not say you are dispatching Phase 2 in parallel and then emit only one coder task. Parallel implementation means multiple nested coder task calls in the same group tool call.",
+      "When a foundation coder finishes, do one readiness pass and launch all dependent slices that can now start. Do not announce a later CLI, test, or docs task if it could have been included in that same group.",
     ])
     .context("Coder Handoff Requirements", [
       "Give every coder the user goal, chosen plan summary, exact scope, directories or files, public contract files to implement or respect, expected outputs, constraints, test expectations, what not to touch, and how to report questions or blockers.",
@@ -146,6 +152,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Keep coder prompts small enough to scan: point to handoff_files, state the slice goal, owned files, avoided files, contract files, verification, and return format.",
       "Tell coders to read assigned handoff_files first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.",
       "Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.",
+      "Use the handoff files to keep the user experience smooth: avoid huge duplicated coder prompts, avoid needless approval loops, and make each coder's assignment short enough to understand at a glance.",
       "Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.",
     ])
     .use((builder) => withQuestionEscalationProtocol(builder, "orchestrator"))
@@ -226,7 +233,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "implementation group call",
       `{
   "name": "implementation-slices",
-  "description": "Implement the selected plan through isolated coder-owned work packages.",
+  "description": "Implement every ready selected-plan slice through isolated coder-owned work packages.",
   "priority": "high",
   "calls": [
     {
@@ -242,6 +249,51 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
           "docs/orchestration/<feature>/core-domain/README.md"
         ],
         "prompt": "Implement the core domain slice. Work primarily in src/core-domain. Respect the public interfaces defined in the handoff files. Do not edit UI or persistence files unless required by the interface. Return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "adapter-coder",
+      "description": "Implement the adapter or integration module according to its interface contract.",
+      "input": {
+        "description": "Implement adapter module",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/adapter/README.md"
+        ],
+        "prompt": "Implement the adapter slice. Work primarily in src/adapter. Respect the public interfaces defined in the handoff files. Do not edit core-domain files unless required by the interface. Return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "cli-coder",
+      "description": "Implement the CLI or user-facing command surface against the same contracts.",
+      "input": {
+        "description": "Implement CLI surface",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/cli/README.md"
+        ],
+        "prompt": "Implement the CLI slice against the contracts in handoff_files. Work primarily in src/cli. Do not edit core-domain or adapter files unless the handoff explicitly permits it. Return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "test-coder",
+      "description": "Add focused tests or fixtures against the same contracts.",
+      "input": {
+        "description": "Add focused test coverage",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/tests/README.md"
+        ],
+        "prompt": "Add focused test coverage for the feature using the contracts in handoff_files. Work primarily in the test directories named by the handoff. Do not rewrite implementation files unless a small fixture or export is explicitly required. Return files changed, tests run, questions, risks, and next steps."
       }
     }
   ]

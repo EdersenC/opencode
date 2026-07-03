@@ -275,7 +275,7 @@ describe("tool.registry", () => {
       expect(ids).toContain("read")
       expect(ids).toContain("glob")
       expect(ids).toContain("grep")
-      expect(ids).not.toContain("bash")
+      expect(ids).toContain("bash")
       expect(ids).not.toContain("webfetch")
       expect(ids).not.toContain("websearch")
       expect(ids).not.toContain("todowrite")

@@ -158,6 +158,7 @@ const layer = Layer.effect(
                 external_directory: readonlyExternalDirectory,
                 group: "allow",
                 task: "allow",
+                bash: "ask",
                 grep: "allow",
                 glob: "allow",
                 edit: "allow",
@@ -231,6 +232,7 @@ const layer = Layer.effect(
                 },
                 grep: "allow",
                 glob: "allow",
+                bash: "ask",
                 edit: "allow",
                 read: {
                   "*": "allow",

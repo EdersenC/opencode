@@ -21,12 +21,15 @@ Usage notes:
 16. For coder groups, use the configured coder subagents/models to do the coding work. The caller should coordinate contracts, boundaries, review, and verification rather than manually implementing medium or large slices.
 17. If engine, CLI, tests, docs, adapters, or UI can all code against the same handoff files, dispatch them together in one implementation group.
 18. Keep nested coder prompts concise. Put large handoff documents in input.handoff_files and tell the coder which files to own, avoid, verify, and report on.
+19. A group is not limited to one or two task calls. If four or five ready coder slices have non-overlapping ownership, put all four or five nested task calls in the same group.
+20. Do not call a single-coder group "parallel" when other ready coder slices are waiting. Parallel work means multiple nested task calls in the same group call or multiple independent group calls in the same assistant message.
+21. After a foundation task returns, do one readiness pass and launch every now-ready dependent coder slice together. Do not serially drip-feed engine, CLI, tests, and docs if the contracts let them proceed.
 
 Example input:
 
 {
   "name": "implement-xyz-feature",
-  "description": "Two agents implement separate parts of the XYZ feature and return one combined result.",
+  "description": "Several agents implement separate ready slices of the XYZ feature and return one combined result.",
   "priority": "high",
   "calls": [
     {
@@ -50,6 +53,34 @@ Example input:
         "description": "Implement XYZ runtime",
         "subagent_type": "general",
         "prompt": "Implement the runtime behavior for XYZ using the interface created by the other task. Return files changed, important decisions, and remaining risks."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "xyz-cli",
+      "description": "Implement the CLI surface for XYZ against the shared contract.",
+      "input": {
+        "description": "Implement XYZ CLI",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/xyz/contracts.md",
+          "docs/orchestration/xyz/cli/README.md"
+        ],
+        "prompt": "Implement the CLI slice for XYZ. Read handoff_files first, work only in the CLI files named there, respect shared contracts, run focused verification, and return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "xyz-tests",
+      "description": "Add focused tests for XYZ against the shared contract.",
+      "input": {
+        "description": "Add XYZ tests",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/xyz/contracts.md",
+          "docs/orchestration/xyz/tests/README.md"
+        ],
+        "prompt": "Add focused tests for XYZ. Read handoff_files first, work only in the test files named there, do not rewrite implementation files unless the handoff permits it, and return files changed, tests run, questions, risks, and next steps."
       }
     }
   ]

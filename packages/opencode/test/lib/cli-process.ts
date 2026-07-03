@@ -27,13 +27,14 @@ import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import path from "node:path"
 import { TestLLMServer } from "./llm-server"
-import { testProviderConfig } from "./test-provider"
+import { testDeepSeekModelID, testProviderConfig } from "./test-provider"
 import { it } from "./effect"
 
 const opencodeRoot = path.resolve(import.meta.dir, "../../")
 const cliEntry = path.join(opencodeRoot, "src/index.ts")
 
 export const testModelID = "test/test-model"
+export { testDeepSeekModelID }
 
 // Wrap a Bun subprocess pipe (or any ReadableStream<Uint8Array>) as a Stream.
 // Centralizes the `evaluate` + `onError` boilerplate and tags errors with the
@@ -63,6 +64,7 @@ function isolatedEnv(home: string, configJson: string): Record<string, string> {
   return {
     OPENCODE_TEST_HOME: home,
     HOME: home,
+    PWD: home,
     XDG_CONFIG_HOME: path.join(home, ".config"),
     XDG_DATA_HOME: path.join(home, ".local/share"),
     XDG_STATE_HOME: path.join(home, ".local/state"),

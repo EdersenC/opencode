@@ -31,6 +31,11 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("readiness batching check")
     expect(lower).toContain("do not make the user watch avoidable serial phases")
     expect(lower).toContain("contract-ready task should not wait for sibling code")
+    expect(lower).toContain("group is not limited to one or two agents")
+    expect(lower).toContain("multiple nested coder task calls in the same group tool call")
+    expect(lower).toContain("cli-coder")
+    expect(lower).toContain("test-coder")
+    expect(lower).toContain("short enough to understand at a glance")
   })
 
   test("planner prompt compiles from builder segments", () => {

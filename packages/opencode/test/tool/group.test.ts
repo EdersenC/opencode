@@ -203,6 +203,9 @@ describe("tool.group", () => {
       expect(def.description).toContain("all of those inner task calls start concurrently")
       expect(def.description).toContain("dispatch them together in one implementation group")
       expect(def.description).toContain("Keep nested coder prompts concise")
+      expect(def.description).toContain("not limited to one or two task calls")
+      expect(def.description).toContain("Do not call a single-coder group")
+      expect(def.description).toContain("Do not serially drip-feed engine, CLI, tests, and docs")
     }),
   )
 
