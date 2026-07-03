@@ -24,6 +24,11 @@ Usage notes:
 19. A group is not limited to one or two task calls. If four or five ready coder slices have non-overlapping ownership, put all four or five nested task calls in the same group.
 20. Do not call a single-coder group "parallel" when other ready coder slices are waiting. Parallel work means multiple nested task calls in the same group call or multiple independent group calls in the same assistant message.
 21. After a foundation task returns, do one readiness pass and launch every now-ready dependent coder slice together. Do not serially drip-feed engine, CLI, tests, and docs if the contracts let them proceed.
+22. Treat calls[] as the batch. Fill it with every ready sibling task that can safely run from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
+23. If you say a phase is parallel, the group call should normally contain multiple nested task calls. A single nested task is not parallel unless there are also independent group calls in the same assistant message.
+24. Do not run engine first, then CLI, then tests when CLI and tests can code against the same handoff files. Put engine, CLI, tests, docs, adapters, or UI together when ownership boundaries are clear.
+25. Use descriptive group.name and calls[].name values because users see those labels while work is running.
+26. Keep the user experience smooth: point coder tasks at handoff_files, keep prompts short, and avoid making the user wait through avoidable serial batches.
 
 Example input:
 

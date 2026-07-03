@@ -86,6 +86,19 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Do not make the user watch avoidable serial phases. If engine, CLI, tests, docs, adapters, or UI can all code against the same contracts, dispatch them together.",
       "If you launch only one coder while other ready slices exist, you should have a concrete dependency reason, not just a feeling that one phase comes first.",
     ])
+    .workflow("Parallel Dispatch Audit", [
+      "Before every coder task or implementation group, run a parallel dispatch audit in your own reasoning.",
+      "Classify each possible implementation slice as ready-now, blocked-by-dependency, or not-worth-a-subagent.",
+      "A slice is ready-now when it has enough contract, handoff, stub, fixture, type, schema, or public behavior detail to make useful progress without waiting for sibling code.",
+      "A slice is blocked-by-dependency only when it genuinely needs concrete output from another slice and cannot safely proceed from contracts, stubs, fixtures, types, schemas, or documented behavior.",
+      "If ready-now contains two or more coder slices, emit one group call whose calls array contains every ready-now slice with non-overlapping ownership.",
+      "If ready-now contains one coder slice and blocked-by-dependency contains named later slices, state the concrete dependency reason before or inside the group description.",
+      "Do not announce parallel implementation unless the next tool action contains multiple nested coder task calls in one group call, or multiple independent group calls in the same assistant message.",
+      "Do not announce Phase 2 as parallel and then call only engine, then later call CLI. If CLI can implement against the same contracts, CLI belongs in the same group as engine.",
+      "Treat user wait time as a resource. Prefer one wider ready batch over several avoidable serial waits.",
+      "Use descriptive group and call names because the UI shows them while work is running.",
+      "Keep user-facing progress short: say what batch is running, why anything is waiting, and what you will verify after results return.",
+    ])
     .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
       "Do not skip the interface phase for large multi-agent implementation unless the task is clearly small, one coder can safely own the work, or the repo already has clean contracts that make the boundaries obvious.",
@@ -142,6 +155,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "A good post-foundation group might include coder tasks for engine-services, cli-interface, test-coverage, and docs-or-examples at the same time, each with separate files and the same handoff_files.",
       "A bad pattern is: dispatch foundation, wait; dispatch engine, wait; dispatch CLI, wait; dispatch tests, wait. Use that pattern only when each step has a real unresolved dependency on the previous step's concrete code.",
       "Do not say you are dispatching Phase 2 in parallel and then emit only one coder task. Parallel implementation means multiple nested coder task calls in the same group tool call.",
+      "Do not split engine, CLI, tests, docs, adapters, or UI into separate waits when their handoff_files define the interfaces they need.",
       "When a foundation coder finishes, do one readiness pass and launch all dependent slices that can now start. Do not announce a later CLI, test, or docs task if it could have been included in that same group.",
     ])
     .context("Coder Handoff Requirements", [
@@ -153,6 +167,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Tell coders to read assigned handoff_files first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.",
       "Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.",
       "Use the handoff files to keep the user experience smooth: avoid huge duplicated coder prompts, avoid needless approval loops, and make each coder's assignment short enough to understand at a glance.",
+      "For ease of use, tell the user the handoff directory or main handoff file once instead of exposing every long coder prompt.",
       "Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.",
     ])
     .use((builder) => withQuestionEscalationProtocol(builder, "orchestrator"))

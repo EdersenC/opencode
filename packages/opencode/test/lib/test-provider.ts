@@ -1,7 +1,7 @@
 // Shared provider config for tests that need opencode to talk to a fake LLM
-// over a real HTTP endpoint. Registers a single provider `test` with a single
-// model `test-model` (i.e. `--model test/test-model`), pointed at the URL the
-// caller supplies (typically a TestLLMServer instance).
+// over a real HTTP endpoint. Registers a single provider `test` with
+// deterministic test models, pointed at the URL the caller supplies
+// (typically a TestLLMServer instance).
 //
 // Used by:
 //   - test/lib/run-process.ts          (subprocess CLI tests)

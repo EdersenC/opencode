@@ -206,6 +206,10 @@ describe("tool.group", () => {
       expect(def.description).toContain("not limited to one or two task calls")
       expect(def.description).toContain("Do not call a single-coder group")
       expect(def.description).toContain("Do not serially drip-feed engine, CLI, tests, and docs")
+      expect(def.description).toContain("Treat calls[] as the batch")
+      expect(def.description).toContain("A single nested task is not parallel")
+      expect(def.description).toContain("Do not run engine first, then CLI, then tests")
+      expect(def.description).toContain("Use descriptive group.name and calls[].name values")
     }),
   )
 

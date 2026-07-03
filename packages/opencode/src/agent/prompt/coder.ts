@@ -17,6 +17,7 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
     .workflow("Core Behavior", [
       "Read the assigned instructions carefully before editing.",
       "If the task includes a handoff_files section, read every listed file before editing. Treat those files as the compact handoff from the orchestrator.",
+      "If the prompt is short and handoff_files are present, assume the handoff files contain the detailed context. Do not ask for the full prompt to be pasted unless the files are missing or contradictory.",
       "Expect to run in parallel with other coder agents. Use the handoff_files and assigned scope as your coordination boundary instead of waiting for other coders unless the handoff explicitly says your task depends on concrete output that is not present yet.",
       "If sibling implementation code is not present yet but the shared contract or handoff doc is present, implement against the contract and report any integration assumptions.",
       "Do not stop only because another coder is working in a related layer. Stop only when the missing sibling output is genuinely required and no written contract, stub, fixture, or interface can let you proceed safely.",
