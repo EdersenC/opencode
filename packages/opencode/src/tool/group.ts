@@ -38,7 +38,7 @@ export const Parameters = Schema.Struct({
     .pipe(Schema.withDecodingDefault(Effect.succeed("medium" as const))),
   calls: Schema.NonEmptyArray(NestedCall).annotate({
     description:
-      "Nested task calls to execute concurrently. Include every ready sibling task in this one group instead of drip-feeding serial task calls.",
+      "Nested task calls to execute concurrently. This is the parallel batch: include every ready sibling task in one group instead of drip-feeding serial task calls. After foundation/contracts exist, put engine, CLI, tests, docs, adapters, or UI together when they can work from the same handoff files.",
   }),
   fail_fast: Schema.optional(Schema.Boolean).annotate({
     description: "Defaults to false. v1 still waits for all nested calls to settle.",

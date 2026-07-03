@@ -13,6 +13,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
     .goal([
       "Use orchestration for large, ambiguous, or multi-part goals.",
       "Do not behave like a single-threaded coder unless the task is obviously small, isolated, or tied to one known file.",
+      "When multiple coder slices are ready, dispatch them together in one group call instead of making the user wait through serial coder rounds.",
       "Coordinate planning, contracts, coder dispatch, review, reconciliation, verification, and final synthesis.",
     ])
     .use(withOrchestrationLifecycle)
@@ -109,6 +110,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use contracts, stubs, schemas, fixtures, and handoff files to make dependent work parallel-ready when that is safe.",
       "After a foundation or shared-contract coder returns, reclassify every deferred slice once, then launch the widest safe follow-up group.",
       "Do not defer CLI, tests, docs, examples, adapters, or UI just because the engine is still being written if those slices can code to the same public contract.",
+      "Post-foundation anti-pattern: foundation finishes, then you launch engine alone, wait, then launch CLI alone, wait, then launch tests. Correct pattern: after foundation finishes, launch engine, CLI, tests, docs, adapters, or UI together when their handoff files make them contract-ready.",
       "For the user's ease, use short descriptive group and call names, keep progress updates one or two sentences, and explain only real waiting dependencies.",
       "Do not show the user giant coder prompts. Create or reference compact handoff files, pass them through handoff_files, and display only the high-level batch plan.",
     ])
@@ -171,6 +173,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Do not say you are dispatching Phase 2 in parallel and then emit only one coder task. Parallel implementation means multiple nested coder task calls in the same group tool call.",
       "Do not split engine, CLI, tests, docs, adapters, or UI into separate waits when their handoff_files define the interfaces they need.",
       "When a foundation coder finishes, do one readiness pass and launch all dependent slices that can now start. Do not announce a later CLI, test, or docs task if it could have been included in that same group.",
+      "If you defer a coder slice after foundation, name the exact missing concrete artifact that prevents that deferred coder from starting from the existing contracts.",
     ])
     .context("Coder Handoff Requirements", [
       "Give every coder the user goal, chosen plan summary, exact scope, directories or files, public contract files to implement or respect, expected outputs, constraints, test expectations, what not to touch, and how to report questions or blockers.",
@@ -327,6 +330,68 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
     }
   ]
 }`,
+    )
+    .example(
+      "post-foundation ready batch",
+      `After a foundation or contract task completes, do not drip-feed dependent coders when the handoff files are enough for them to start.
+
+Correct follow-up group shape:
+
+{
+  "name": "post-foundation-implementation",
+  "description": "Foundation contracts are ready. Implement every now-ready slice in one grouped coder batch.",
+  "priority": "high",
+  "calls": [
+    {
+      "tool": "task",
+      "name": "engine-services",
+      "description": "Implement engine services against the shared contracts.",
+      "input": {
+        "description": "Implement engine services",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/engine/README.md"
+        ],
+        "prompt": "Implement the engine service slice. Read handoff_files first, own only the engine files named there, respect shared contracts, run focused verification, and return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "cli-interface",
+      "description": "Implement the CLI against the same contracts without waiting for engine code to finish.",
+      "input": {
+        "description": "Implement CLI interface",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/cli/README.md"
+        ],
+        "prompt": "Implement the CLI slice against the contracts. Read handoff_files first, own only the CLI files named there, use stubs or documented interfaces where sibling code is still landing, and return files changed, tests run, questions, risks, and next steps."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "test-coverage",
+      "description": "Add focused tests against the same contracts.",
+      "input": {
+        "description": "Add focused test coverage",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/tests/README.md"
+        ],
+        "prompt": "Add focused tests for the feature. Read handoff_files first, own only the test files named there, test the documented behavior, and return files changed, tests run, questions, risks, and next steps."
+      }
+    }
+  ]
+}
+
+Incorrect pattern unless each step has a real concrete dependency:
+foundation complete -> engine-services only -> wait -> cli-interface only -> wait -> test-coverage only.`,
     )
     .compile(options)
 }

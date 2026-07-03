@@ -322,7 +322,7 @@ exports[`tool parameters JSON Schema (wire shape) task 1`] = `
       "type": "array",
     },
     "prompt": {
-      "description": "The task for the agent to perform",
+      "description": "Concise task instructions for the agent. Use handoff_files for large contracts, READMEs, and context documents.",
       "type": "string",
     },
     "subagent_type": {

@@ -214,6 +214,8 @@ describe("tool.group", () => {
       expect(def.description).toContain("Batch before narration")
       expect(def.description).toContain("If only one nested coder call is ready")
       expect(def.description).toContain("reclassify deferred slices once")
+      expect(def.description).toContain("Post-foundation anti-pattern")
+      expect(def.description).toContain("If you defer a coder slice after foundation")
     }),
   )
 

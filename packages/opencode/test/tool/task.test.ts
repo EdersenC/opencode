@@ -186,6 +186,8 @@ describe("tool.task", () => {
         expect(general).toBeGreaterThan(explore)
         expect(planner).toBeGreaterThan(general)
         expect(zebra).toBeGreaterThan(planner)
+        expect(first).toContain("prefer group with multiple nested task calls")
+        expect(first).toContain("For a post-foundation implementation layer")
       }),
     {
       config: {
