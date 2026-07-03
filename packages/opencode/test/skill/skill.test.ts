@@ -83,6 +83,10 @@ describe("skill", () => {
           expect(interfaceSkill.content).toContain("Interface Contracts")
           expect(interfaceSkill.content).toContain("Coder Dispatch Prompts")
           expect(interfaceSkill.content).toContain("Parallel Versus Sequential Guidance")
+          expect(interfaceSkill.content).toContain("Which coder owns the implementation")
+          expect(interfaceSkill.content).toContain("Which other work packages consume it")
+          expect(interfaceSkill.content).toContain("Correctness Criteria")
+          expect(interfaceSkill.content).toContain("Review Focus")
         }),
       { git: true },
     ),

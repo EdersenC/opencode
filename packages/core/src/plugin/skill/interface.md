@@ -45,6 +45,14 @@ Create actual interface code when it reduces coordination risk or clarifies a bo
 
 Avoid overengineering. Do not create abstractions only for ceremony. Create the smallest contract that lets independent coders work safely.
 
+Each interface contract should record:
+
+- Which coder owns the implementation.
+- Which other work packages consume it.
+- What correctness means for the contract.
+- Which compatibility or public API constraints must not be silently broken.
+- Which tests or checks prove the contract is respected.
+
 ## Recommended Artifacts
 
 - `docs/orchestration/<feature-slug>/overview.md`
@@ -65,6 +73,8 @@ Each coder should receive a clear ownership slice:
 - Shared contract files that should not be casually changed.
 - Upstream and downstream dependencies.
 - Public contracts the slice must implement or respect.
+- Correctness criteria for the slice.
+- Review focus for the orchestrator after implementation.
 - Expected tests and verification commands.
 - Known risks and escalation questions.
 
@@ -130,6 +140,12 @@ Give concrete guidance, constraints, and style expectations.
 
 ## Testing Expectations
 List tests to add/run.
+
+## Correctness Criteria
+Describe what must be true for this slice to be considered correct.
+
+## Review Focus
+List the integration, quality, boundary, security, reliability, performance, or contract risks the orchestrator should inspect after implementation.
 
 ## Questions / Risks
 List known unknowns and when to escalate to orchestrator.

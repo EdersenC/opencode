@@ -139,6 +139,9 @@ describe("AgentV2", () => {
       expect(orchestrate?.system).toContain("<questions_for_orchestrator>")
       expect(orchestrate?.system).toContain("redispatch only affected coder tasks")
       expect(orchestrate?.system).toContain("boundary-based")
+      expect(orchestrate?.system).toContain("reviewer and integrator")
+      expect(orchestrate?.system).toContain("inspect actual diffs")
+      expect(orchestrate?.system).toContain("redispatch targeted coder tasks")
       expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "*", effect: "deny" })
       expect(orchestrate?.permissions).toContainEqual({ action: "skill", resource: "interface", effect: "allow" })
 
@@ -150,6 +153,8 @@ describe("AgentV2", () => {
       expect(coder?.system).toContain("<questions_for_orchestrator>")
       expect(coder?.system).toContain("recommended options")
       expect(coder?.system).toContain("safe default")
+      expect(coder?.system).toContain("keep changes focused and reviewable")
+      expect(coder?.system).toContain("deviations_from_interface_docs")
 
       const planner = yield* agent.get(AgentV2.ID.make("planner"))
       expect(planner?.mode).toBe("subagent")

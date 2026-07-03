@@ -72,7 +72,7 @@ This agent is useful when you want the LLM to analyze code, suggest changes, or 
 
 _Mode_: `primary`
 
-An agent for large, ambiguous, or multi-part goals where parallel planning, implementation, and review are useful. It decomposes work into grouped subagent tasks, asks clarifying questions early when requirements are ambiguous, compares multiple plans, coordinates implementation, and synthesizes results.
+An agent for large, ambiguous, or multi-part goals where parallel planning, implementation, review, and reconciliation are useful. It decomposes work into grouped subagent tasks, asks clarifying questions early when requirements are ambiguous, compares multiple plans, coordinates implementation, reviews coder output, redispatches targeted fixes when needed, and synthesizes results.
 
 In normal CLI/TUI, app, and desktop usage, Orchestrate can use the `question` tool when its permissions allow it. Other runtime clients may hide `question` unless `OPENCODE_ENABLE_QUESTION_TOOL` is enabled.
 
@@ -106,7 +106,7 @@ A read-only planning agent that creates one concrete implementation plan for a c
 
 _Mode_: `subagent`
 
-An implementation agent for scoped, high-quality coding work. Users usually do not select Coder directly; Orchestrate dispatches coder agents through grouped Task calls after planning and interface or contract preparation.
+An implementation agent for scoped, high-quality coding work. Users usually do not select Coder directly; Orchestrate dispatches coder agents through grouped Task calls after planning and interface or contract preparation, then reviews and reconciles their output.
 
 ---
 
