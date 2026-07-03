@@ -247,6 +247,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
     variant: state.activeVariant,
     tuiConfig,
     backgroundSubagents: input.backgroundSubagents,
+    autoPermission: input.autoPermission,
     onPermissionReply: async (next) => {
       if (state.demo?.permission(next)) {
         return

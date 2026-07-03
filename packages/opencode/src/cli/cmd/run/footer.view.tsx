@@ -88,6 +88,7 @@ type RunFooterViewProps = {
   diffStyle?: RunDiffStyle
   tuiConfig: RunTuiConfig
   backgroundSubagents: boolean
+  autoPermission: boolean
   history?: RunPrompt[]
   agent: string
   onSubmit: (input: RunPrompt) => boolean
@@ -420,7 +421,7 @@ export function RunFooterView(props: RunFooterViewProps) {
       return ""
     }
 
-    return [timing(), usage()].filter((item) => item.length > 0).join(" · ")
+    return [props.autoPermission ? "AUTO" : "", timing(), usage()].filter((item) => item.length > 0).join(" · ")
   })
   const modelStatus = createMemo(() => {
     const current = props.currentModel()

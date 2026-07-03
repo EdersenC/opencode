@@ -161,6 +161,7 @@ async function renderFooter(
     currentVariant?: string
     subagents?: FooterSubagentState
     backgroundSubagents?: boolean
+    autoPermission?: boolean
     width?: number
     height?: number
     state?: Partial<FooterState>
@@ -199,6 +200,7 @@ async function renderFooter(
           theme={input.theme ?? (() => RUN_THEME_FALLBACK)}
           tuiConfig={config}
           backgroundSubagents={input.backgroundSubagents ?? true}
+          autoPermission={input.autoPermission ?? false}
           agent="opencode"
           onSubmit={input.onSubmit ?? (() => true)}
           onPermissionReply={() => {}}
@@ -952,6 +954,7 @@ test("direct footer shows editable prompts and additional queued work while runn
           theme={() => RUN_THEME_FALLBACK}
           tuiConfig={tuiConfig}
           backgroundSubagents={true}
+          autoPermission={false}
           agent="opencode"
           onSubmit={() => true}
           onPermissionReply={() => {}}
@@ -1106,6 +1109,22 @@ test("direct footer shows full usage metadata when room is available", async () 
     const frame = app.captureCharFrame()
 
     expect(frame).toContain("159.6K (16%) · $4.23")
+  } finally {
+    app.cleanup()
+  }
+})
+
+test("direct footer shows auto permission mode when enabled", async () => {
+  const app = await renderFooter({
+    autoPermission: true,
+    state: { timing: "total 1.2s · work 900ms · idle 300ms" },
+  })
+
+  try {
+    await app.renderOnce()
+    const frame = app.captureCharFrame()
+
+    expect(frame).toContain("AUTO · total 1.2s · work 900ms · idle 300ms")
   } finally {
     app.cleanup()
   }
