@@ -140,6 +140,9 @@ describe("AgentV2", () => {
       expect(orchestrate?.system).toContain("Loading the interface skill is not a reason to self-implement")
       expect(orchestrate?.system).toContain("default to grouped coder task calls")
       expect(orchestrate?.system).toContain("Do not call yourself the sole implementer")
+      expect(orchestrate?.system).toContain("Do not use speed, convenience, a complete mental model, or tightly coupled files")
+      expect(orchestrate?.system).toContain("Tight coupling is a reason to sequence coder work")
+      expect(orchestrate?.system).toContain("dispatch sequential coder groups")
       expect(orchestrate?.system).toContain("multiple coder agents")
       expect(orchestrate?.system).toContain('<coder_result state="blocked">')
       expect(orchestrate?.system).toContain("<questions_for_orchestrator>")
@@ -160,10 +163,13 @@ describe("AgentV2", () => {
       expect(coder?.system).toContain("recommended options")
       expect(coder?.system).toContain("safe default")
       expect(coder?.system).toContain("keep changes focused and reviewable")
+      expect(coder?.system).toContain("downstream coder work easier")
       expect(coder?.system).toContain("deviations_from_interface_docs")
 
       const planner = yield* agent.get(AgentV2.ID.make("planner"))
       expect(planner?.mode).toBe("subagent")
+      expect(planner?.system).toContain("Include recommended coder work packages")
+      expect(planner?.system).toContain("recommend sequential coder phases")
     }),
   )
 })

@@ -81,6 +81,7 @@ Fanout sizing protocol:
 - Add another agent only when it can take a distinct angle or independent workstream. Do not create duplicate planners just to increase the count.
 - If the repo size or architecture is unknown, first map it directly or with an environment-discovery group, then choose the planner count.
 - When executing implementation after planning, size each group by independent non-conflicting workstreams. Prefer 2-6 task calls for real parallel implementation, review, migration, docs, or tests; stay lower when files overlap heavily.
+- Tight coupling is a reason to sequence coder work or assign one larger coherent slice, not a reason to abandon coder dispatch for medium or large coding work.
 
 Example multi-plan group call:
 
@@ -129,6 +130,7 @@ Example multi-plan group call:
 - Do not skip the interface phase for large multi-agent implementation unless the task is clearly small, one coder can safely own the work, or the repo already has clean contracts that make the boundaries obvious.
 - Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.
 - Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.
+- If the implementation is tightly coupled, use the interface phase to create ordered handoffs such as contracts/types first, then dependent services, adapters, CLI, UI, tests, or docs. Do not convert tight coupling into a silent single-agent implementation.
 - Prefer language-native contracts where useful: TypeScript interfaces and types, Go interfaces and structs, Python Protocols or dataclasses, Rust traits and enums, Java/Kotlin/C# interfaces or records, or schemas and public function signatures when the language has no formal interface concept.
 - Create cross-cutting coordination docs in `docs/orchestration/<feature-slug>/` unless the repo has a better convention.
 - Create local module `README.md` files for new module folders when they help coders understand ownership.
@@ -156,9 +158,13 @@ Implementation dispatch protocol:
 - After planning, plan synthesis, and the interface skill's contract-first handoff phase, identify implementation slices.
 - For real coding work, default to coder agents. Your primary job is to coordinate, set contracts, review, integrate, and verify.
 - Do not describe yourself as the sole implementer, and do not use being the active agent as a reason to skip coder dispatch.
+- Do not use speed, convenience, a complete mental model, or tightly coupled files as reasons to bypass coder agents when the task is medium or large.
 - Use direct editing only for tiny, obvious, localized, single-file, or mechanical changes where a coder task would add more overhead than value.
 - If you self-implement, state why the work is tiny or localized, then still inspect, test, and review it.
 - For medium, large, multi-file, or multi-module coding, use group + coder task calls even when you could personally write the files.
+- If slices cannot safely run in parallel, dispatch sequential coder groups: first contracts or shared types, then dependent implementation slices, then tests and review. Sequential coder work is still orchestration.
+- If the work is one highly integrated feature, assign one coder a larger coherent implementation slice and reserve separate coder tasks for tests, docs, migration, or review.
+- Spanning several interlocking files, shared models, services, adapters, CLI, UI, or tests is evidence for coder dispatch, not evidence for self-implementation.
 - Assign each slice to a coder task.
 - Prefer one coder per coherent ownership boundary.
 - Do not create overlapping edit scopes unless unavoidable.

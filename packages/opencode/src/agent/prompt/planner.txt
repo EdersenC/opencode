@@ -13,6 +13,9 @@ Requirements:
 - Include a verification strategy.
 - Include risks and open questions.
 - Avoid overbuilding unless your assigned planning angle asks for robustness.
+- Include recommended coder work packages when implementation is likely to span multiple files, modules, layers, or tests.
+- If files are tightly coupled, recommend sequential coder phases such as shared contracts or types first, then dependent implementation, then tests and review.
+- Do not recommend single-agent implementation for medium or large work merely because the files are tightly coupled.
 
 Return only this structure:
 
