@@ -33,7 +33,7 @@ You can also use `--permission-mode auto`, including with [`opencode run`](/docs
 opencode run --permission-mode auto "Refactor this module"
 ```
 
-Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask. Clearly destructive commands such as deleting root or home directories are denied.
+Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, execute downloaded packages, broadly delete the workspace, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask. Clearly destructive commands such as deleting root or home directories are denied.
 
 Auto mode follows the active session, including subagents launched through `task` and `group` by agents such as `orchestrate`. Agent-level deny rules still win, so read-only agents such as `plan` and planner-style subagents do not gain mutation access just because auto mode is active.
 

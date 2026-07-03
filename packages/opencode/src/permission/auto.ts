@@ -42,6 +42,8 @@ const PERMISSION_SYSTEM_MUTATION =
 const PRIVILEGED = /(^|[;&|]\s*)(sudo|su|doas)\b/i
 const GLOBAL_PACKAGE_INSTALL =
   /(^|[;&|]\s*)(npm|pnpm|yarn|bun)\s+(install|add|i)\b(?=[\s\S]*\s(-g|--global)(\s|$))/i
+const PACKAGE_EXEC =
+  /(^|[;&|]\s*)(npx|bunx|npm\s+(exec|x|create|init)|pnpm\s+(dlx|create)|yarn\s+(dlx|create)|bun\s+(x|create))\b/i
 const PUBLISH = /(^|[;&|]\s*)(npm|pnpm|yarn|bun|cargo)\s+publish\b/i
 const GIT_PUSH = /(^|[;&|]\s*)git\s+push\b/i
 const EXTERNAL_SCRIPT =
@@ -53,7 +55,8 @@ const DIRECTORY_ESCAPE = /(^|[;&|]\s*)(cd|chdir|pushd|push-location|set-location
 const REDIRECT_OUTSIDE = /(^|[^0-9])>>?\s*(\/|~|\$HOME\b|\$\{HOME\}|[A-Za-z]:[\\/])/i
 const DOCKER_HOST_MOUNT = /(^|[;&|]\s*)(docker|podman)\s+run\b[\s\S]*(^|\s)(-v|--volume)\s+\/:/i
 const AMBIGUOUS_DELETE =
-  /(^|[;&|]\s*)rm\s+(?:-[^\s]*r[^\s]*f[^\s]*|-[^\s]*f[^\s]*r[^\s]*|-[^\s]*r[^\s]*\s+-[^\s]*f|-[^\s]*f[^\s]*\s+-[^\s]*r)\s+(?:--\s+)?(\.|\*)(?=$|[\s;&|])/i
+  /(^|[;&|]\s*)rm\s+(?:-[^\s]*r[^\s]*f[^\s]*|-[^\s]*f[^\s]*r[^\s]*|-[^\s]*r[^\s]*\s+-[^\s]*f|-[^\s]*f[^\s]*\s+-[^\s]*r)\s+(?:--\s+)?(["']?)(\.\/?|\.(?:[\\/]\*)?|\*|\$PWD|\$\{PWD\})\2(?=$|[\s;&|])/i
+const FIND_DESTRUCTIVE = /(^|[;&|]\s*)find\s+[\s\S]*(\s-delete\b|-exec\s+rm\s+)/i
 const SYSTEM_PATH =
   /(^|\s)(\/etc|\/usr|\/bin|\/sbin|\/var|\/opt|\/root|\/tmp|\/Library|~|\$HOME\b|\$\{HOME\}|[A-Za-z]:[\\/](Windows|Program Files))\b/i
 const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/
@@ -236,6 +239,7 @@ function askRule(command: string) {
   if (DOCKER_HOST_MOUNT.test(command)) return { reason: "container host mount outside project root", rule: "docker-host-mount" }
   if (PRIVILEGED.test(command)) return { reason: "privileged command", rule: "privileged-command" }
   if (GLOBAL_PACKAGE_INSTALL.test(command)) return { reason: "global package install", rule: "global-package-install" }
+  if (PACKAGE_EXEC.test(command)) return { reason: "package execution or scaffolding command", rule: "package-exec" }
   if (PUBLISH.test(command)) return { reason: "package publish", rule: "package-publish" }
   if (GIT_PUSH.test(command)) return { reason: "git push", rule: "git-push" }
   if (EXTERNAL_SCRIPT.test(command)) return { reason: "external package script or make target", rule: "external-script" }
@@ -243,6 +247,7 @@ function askRule(command: string) {
   if (REMOTE_DOWNLOAD.test(command)) return { reason: "remote download command", rule: "remote-download" }
   if (DIRECTORY_ESCAPE.test(command)) return { reason: "command changes directory outside project root", rule: "directory-escape" }
   if (REDIRECT_OUTSIDE.test(command)) return { reason: "redirect writes outside project root", rule: "outside-redirection" }
+  if (FIND_DESTRUCTIVE.test(command)) return { reason: "broad find deletion", rule: "find-delete" }
   if (AMBIGUOUS_DELETE.test(command)) return { reason: "ambiguous recursive deletion", rule: "ambiguous-delete" }
   if (SYSTEM_PATH.test(command)) return { reason: "command references system or temporary path", rule: "system-path" }
 }
