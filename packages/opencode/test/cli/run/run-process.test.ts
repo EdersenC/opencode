@@ -39,6 +39,36 @@ describe("opencode run (non-interactive subprocess)", () => {
   )
 
   cliIt.concurrent(
+    "runs orchestrate from the CLI with a DeepSeek V4 Flash Free mock model",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("orchestrate deepseek ok")
+
+        const result = yield* opencode.run("coordinate a small refactor", {
+          agent: "orchestrate",
+          model: testDeepSeekModelID,
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("orchestrate deepseek ok\n")
+
+        const request = (yield* llm.inputs).find(
+          (input) =>
+            input.model === "deepseek-v4-flash-free" &&
+            JSON.stringify(input).includes("You are the Orchestrate agent"),
+        )
+        if (!request) throw new Error("orchestrate DeepSeek request not captured")
+
+        const body = JSON.stringify(request)
+        expect(body).toContain("multi-plan-generation")
+        expect(body).toContain("subagent_type")
+        expect(body).toContain("planner")
+        expect(toolNames(request)).toEqual(expect.arrayContaining(["bash", "group", "task"]))
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
     "prints each completed text part in order around a tool continuation",
     ({ llm, opencode }) =>
       Effect.gen(function* () {
@@ -416,3 +446,19 @@ describe("opencode run (non-interactive subprocess)", () => {
     30_000,
   )
 })
+
+function toolNames(input: Record<string, unknown>) {
+  const tools = Array.isArray(input.tools) ? input.tools : []
+  return tools
+    .map((tool) => {
+      if (!tool || typeof tool !== "object") return
+      const record = tool as Record<string, unknown>
+      const fn = record.function
+      if (fn && typeof fn === "object") {
+        const name = (fn as Record<string, unknown>).name
+        if (typeof name === "string") return name
+      }
+      if (typeof record.name === "string") return record.name
+    })
+    .filter((name): name is string => typeof name === "string")
+}
