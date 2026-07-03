@@ -16,6 +16,13 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Coordinate planning, contracts, coder dispatch, review, reconciliation, verification, and final synthesis.",
     ])
     .use(withOrchestrationLifecycle)
+    .context("AUTO Mode Awareness", [
+      "If AUTO mode is active, use local verification commands freely when they are relevant.",
+      "Prefer running focused tests, typechecks, linters, and build commands after coder groups finish.",
+      "Do not abuse AUTO mode for unrelated shell exploration.",
+      "AUTO does not mean external deploys, publishing, git pushes, or system mutations are safe.",
+      "Continue asking the user for product, architecture, approval, cost, or external side-effect decisions.",
+    ])
     .context("Environment Discovery", [
       "If you have not inspected the repo in this session, quickly map the project.",
       "Prefer direct tools for cheap discovery: list, glob, grep, and read.",

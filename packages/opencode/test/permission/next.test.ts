@@ -676,6 +676,16 @@ it.instance(
         }),
       )
       expect(err).toBeInstanceOf(PermissionV1.DeniedError)
+      expect(err).toMatchObject({
+        ruleset: [
+          {
+            permission: "bash",
+            action: "deny",
+            reason: "destructive deletion outside project root",
+            matchedRule: "rm-root-home",
+          },
+        ],
+      })
       expect(yield* list()).toHaveLength(0)
     }),
   { git: true },

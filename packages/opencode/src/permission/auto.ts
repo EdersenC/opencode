@@ -173,23 +173,7 @@ export function autoDecision(input: PermissionLike) {
   return autoRequestDecision(input)
 }
 
-export function canAutoApproveRequest(input: PermissionLike) {
-  return autoRequestDecision(input)?.decision === "allow"
-}
-
-export function canAutoDenyRequest(input: PermissionLike) {
-  return autoRequestDecision(input)?.decision === "deny"
-}
-
-export function canAutoApprove(input: PermissionLike) {
-  return autoDecision(input)?.decision === "allow"
-}
-
-export function canAutoDeny(input: PermissionLike) {
-  return autoDecision(input)?.decision === "deny"
-}
-
-function autoRequestDecision(input: PermissionLike) {
+export function autoRequestDecision(input: PermissionLike) {
   const approval = input.metadata?.autoApprove
   if (
     input.permission !== "bash" ||
@@ -213,6 +197,22 @@ function autoRequestDecision(input: PermissionLike) {
       reason,
     } as ShellClassifierResult
   }
+}
+
+export function canAutoApproveRequest(input: PermissionLike) {
+  return autoRequestDecision(input)?.decision === "allow"
+}
+
+export function canAutoDenyRequest(input: PermissionLike) {
+  return autoRequestDecision(input)?.decision === "deny"
+}
+
+export function canAutoApprove(input: PermissionLike) {
+  return autoDecision(input)?.decision === "allow"
+}
+
+export function canAutoDeny(input: PermissionLike) {
+  return autoDecision(input)?.decision === "deny"
 }
 
 function denyRule(command: string) {

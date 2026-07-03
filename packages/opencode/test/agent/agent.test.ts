@@ -271,6 +271,11 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("\"handoff_files\"")
     expect(lower).toContain("subagent_type\": \"coder")
     expect(lower).toContain("subagent_type\": \"planner")
+    expect(lower).toContain("auto mode awareness")
+    expect(lower).toContain("use local verification commands freely")
+    expect(lower).toContain("focused tests, typechecks, linters, and build commands")
+    expect(lower).toContain("auto does not mean external deploys, publishing, git pushes, or system mutations are safe")
+    expect(lower).toContain("continue asking the user for product, architecture")
   }),
 )
 
@@ -293,6 +298,10 @@ it.instance("coder prompt requires scoped implementation quality and structured 
     expect(lower).toContain("sequential tightly coupled implementation")
     expect(lower).toContain("make the next coder's job easier")
     expect(lower).toContain("reporting any ordering assumptions")
+    expect(lower).toContain("in auto mode, run focused local verification commands when useful")
+    expect(lower).toContain("assigned package or directory")
+    expect(lower).toContain("do not run deploy, publish, git push, or system mutation commands")
+    expect(lower).toContain("report all commands run and their results")
     expect(lower).toContain("do not hide skipped verification")
     expect(lower).toContain("flag any intentional deviation from interface docs")
     expect(lower).toContain("<deviations_from_interface_docs>")

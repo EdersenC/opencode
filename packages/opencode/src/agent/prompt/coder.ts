@@ -26,6 +26,10 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
     .workflow("Testing And Verification", [
       "Add or update tests where practical.",
       "Run focused verification commands when safe.",
+      "In AUTO mode, run focused local verification commands when useful.",
+      "Prefer commands scoped to your assigned package or directory when possible.",
+      "Do not run deploy, publish, git push, or system mutation commands.",
+      "Report all commands run and their results.",
       "Do not claim success unless verification was run or you explain why it was not run.",
       "Do not hide skipped verification.",
     ])

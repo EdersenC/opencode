@@ -2,7 +2,7 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { afterEach, describe, expect, test } from "bun:test"
-import { classifyShellCommand } from "../../src/permission/auto"
+import { autoRequestDecision, classifyShellCommand } from "../../src/permission/auto"
 
 const created: string[] = []
 
@@ -153,5 +153,43 @@ describe("auto shell classifier - existing behavior boundaries", () => {
   test("external directory scan forces ask", () => {
     const root = tmp()
     expect(classify("npm test", root, { externalDirectories: ["/etc"] }).decision).toBe("ask")
+  })
+})
+
+describe("auto permission request decisions", () => {
+  test("preserves decision reasons and matched rules for clients and logs", () => {
+    const root = tmp()
+    expect(
+      autoRequestDecision({
+        permission: "bash",
+        metadata: { autoApprove: classify("npm test", root) },
+      }),
+    ).toMatchObject({
+      decision: "allow",
+      reason: "AUTO: project-local command",
+      matchedRule: "project-local",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "bash",
+        metadata: { autoApprove: classify("git push", root) },
+      }),
+    ).toMatchObject({
+      decision: "ask",
+      reason: "git push",
+      matchedRule: "git-push",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "bash",
+        metadata: { autoApprove: classify("rm -rf /", root) },
+      }),
+    ).toMatchObject({
+      decision: "deny",
+      reason: "destructive deletion outside project root",
+      matchedRule: "rm-root-home",
+    })
   })
 })

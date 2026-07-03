@@ -25,7 +25,7 @@ import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
-import { canAutoApproveRequest, normalizeMode } from "@/permission/auto"
+import { autoRequestDecision, normalizeMode } from "@/permission/auto"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -69,6 +69,28 @@ type SessionInfo = {
   id: string
   title?: string
   directory?: string
+}
+
+function createSessionTreeMatcher(client: OpencodeClient, rootSessionID: string) {
+  const known = new Set([rootSessionID])
+
+  const refresh = async () => {
+    const queue = [...known]
+    for (let index = 0; index < queue.length; index++) {
+      const response = await client.session.children({ sessionID: queue[index]! }).catch(() => undefined)
+      for (const child of response?.data ?? []) {
+        if (known.has(child.id)) continue
+        known.add(child.id)
+        queue.push(child.id)
+      }
+    }
+  }
+
+  return async (sessionID: string) => {
+    if (known.has(sessionID)) return true
+    await refresh()
+    return known.has(sessionID)
+  }
 }
 
 function inline(info: Inline) {
@@ -704,6 +726,7 @@ export const RunCommand = effectCmd({
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
         async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
+          const sessionInScope = createSessionTreeMatcher(client, sessionID)
           const toggles = new Map<string, boolean>()
           let error: string | undefined
 
@@ -804,24 +827,34 @@ export const RunCommand = effectCmd({
 
             if (event.type === "permission.asked") {
               const permission = event.properties
-              if (permission.sessionID !== sessionID) continue
+              if (!(await sessionInScope(permission.sessionID))) continue
+              const decision = auto ? autoRequestDecision(permission) : undefined
 
-              if (auto && canAutoApproveRequest(permission)) {
+              if (decision?.decision === "allow") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",
                 })
-              } else {
-                UI.println(
-                  UI.Style.TEXT_WARNING_BOLD + "!",
-                  UI.Style.TEXT_NORMAL +
-                    `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
-                )
+                continue
+              }
+
+              if (decision?.decision === "deny") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "reject",
                 })
+                continue
               }
+              const reason = decision?.reason ? `; ${decision.reason}` : ""
+              UI.println(
+                UI.Style.TEXT_WARNING_BOLD + "!",
+                UI.Style.TEXT_NORMAL +
+                  `permission requested: ${permission.permission} (${permission.patterns.join(", ")})${reason}; auto-rejecting`,
+              )
+              await client.permission.reply({
+                requestID: permission.id,
+                reply: "reject",
+              })
             }
           }
           return error

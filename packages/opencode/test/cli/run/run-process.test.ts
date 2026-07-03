@@ -46,6 +46,65 @@ describe("opencode run (non-interactive subprocess)", () => {
   )
 
   cliIt.concurrent(
+    "--permission-mode auto auto-approves project-local bash",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.push(
+          reply().tool("bash", {
+            command: "printf auto-mode",
+            description: "Print deterministic output",
+          }),
+        )
+        yield* llm.text("auto done")
+
+        const result = yield* opencode.run("use auto mode", {
+          extraArgs: ["--permission-mode", "auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("auto done\n")
+        expect(result.stderr).not.toContain("permission requested")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "--auto aliases auto permission mode",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.push(
+          reply().tool("bash", {
+            command: "printf auto-alias",
+            description: "Print deterministic output",
+          }),
+        )
+        yield* llm.text("alias done")
+
+        const result = yield* opencode.run("use auto alias", {
+          extraArgs: ["--auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("alias done\n")
+        expect(result.stderr).not.toContain("permission requested")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "rejects invalid permission mode values",
+    ({ opencode }) =>
+      Effect.gen(function* () {
+        const result = yield* opencode.spawn(["run", "--permission-mode", "yolo", "--model", "test/test-model", "hi"])
+
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stderr).toContain("permission-mode")
+        expect(result.stderr).toContain('choices: "ask", "auto"')
+      }),
+    30_000,
+  )
+
+  cliIt.concurrent(
     "prints reasoning before text only with --thinking",
     ({ llm, opencode }) =>
       Effect.gen(function* () {

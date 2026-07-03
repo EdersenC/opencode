@@ -13,6 +13,7 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("environment discovery")
     expect(lower).toContain("question tool usage")
     expect(lower).toContain("multi-plan workflow")
+    expect(lower).toContain("auto mode awareness")
     expect(lower).toContain("contract-first interface phase")
     expect(lower).toContain("implementation dispatch protocol")
     expect(lower).toContain("question and blocker protocol")
@@ -61,6 +62,8 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("interface contract protocol")
     expect(lower).toContain("question and blocker protocol")
     expect(lower).toContain("code quality bar")
+    expect(lower).toContain("auto mode")
+    expect(lower).toContain("report all commands run")
   })
 
   test("compiled prompts are deterministic", () => {
