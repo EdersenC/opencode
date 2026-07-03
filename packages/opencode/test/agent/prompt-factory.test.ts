@@ -25,6 +25,8 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("for tiny edits")
     expect(lower).toContain("subagent_type\": \"planner")
     expect(lower).toContain("subagent_type\": \"coder")
+    expect(lower).toContain("handoff_files")
+    expect(lower).toContain("do not paste large handoff docs")
   })
 
   test("planner prompt compiles from builder segments", () => {
@@ -48,6 +50,7 @@ describe("agent prompt factories", () => {
     expect(prompt).toContain("# Role")
     expect(lower).toContain("you are the coder subagent")
     expect(lower).toContain("scoped work package")
+    expect(lower).toContain("handoff_files")
     expect(lower).toContain("read it first")
     expect(lower).toContain("well-structured technical narrative")
     expect(lower).toContain("each abstraction should have a reason")

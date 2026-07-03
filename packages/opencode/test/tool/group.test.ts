@@ -219,6 +219,55 @@ describe("tool.group", () => {
     }),
   )
 
+  it.instance("passes nested task handoff files through to the child prompt", () =>
+    Effect.gen(function* () {
+      const seedResult = yield* seed()
+      const seen: string[] = []
+      const promptOps: TaskPromptOps = {
+        cancel: () => Effect.void,
+        resolvePromptParts: (template) =>
+          Effect.sync(() => {
+            seen.push(template)
+            return [{ type: "text" as const, text: template }]
+          }),
+        prompt: (promptInput) => Effect.succeed(reply(promptInput, "done")),
+      }
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+
+      const result = yield* def.execute(
+        input({
+          calls: [
+            {
+              tool: "task",
+              name: "core-domain-coder",
+              description: "Implement the core domain module",
+              input: {
+                description: "Implement core domain",
+                prompt: "Implement the scoped work package.",
+                subagent_type: "coder",
+                handoff_files: [
+                  "docs/orchestration/feature/work-packages.md",
+                  "docs/orchestration/feature/contracts.md",
+                  "docs/orchestration/feature/core/README.md",
+                ],
+              },
+            },
+          ],
+        }),
+        context(seedResult, promptOps),
+      )
+
+      expect(result.metadata.group.state).toBe("completed")
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toContain("<handoff_files>")
+      expect(seen[0]).toContain("- docs/orchestration/feature/work-packages.md")
+      expect(seen[0]).toContain("- docs/orchestration/feature/contracts.md")
+      expect(seen[0]).toContain("- docs/orchestration/feature/core/README.md")
+      expect(seen[0]).toContain("<task_prompt>\nImplement the scoped work package.\n</task_prompt>")
+    }),
+  )
+
   it.instance("executes nested task calls concurrently and waits for all results", () =>
     Effect.gen(function* () {
       const seedResult = yield* seed()

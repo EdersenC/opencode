@@ -90,6 +90,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
 - handoff README paths
 - work-package map path
 - coder dispatch prompts
+- handoff_files arrays for each coder task
 - parallel groups and sequential dependencies
 - shared files to avoid changing without orchestrator approval`,
     })
@@ -117,14 +118,18 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Use group to run independent coder tasks concurrently.",
     ])
     .context("Coder Handoff Requirements", [
-      "Give every coder the user goal, chosen plan summary, exact scope, directories, or files, interface or handoff README path, public contract files to implement or respect, expected outputs, constraints, test expectations, what not to touch, and how to report questions or blockers.",
-      "Tell coders to read assigned handoff READMEs first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.",
+      "Give every coder the user goal, chosen plan summary, exact scope, directories or files, public contract files to implement or respect, expected outputs, constraints, test expectations, what not to touch, and how to report questions or blockers.",
+      "Use the task input handoff_files array for every relevant handoff README, interface contract, work-package map, and context file. This is the preferred way to point coders at docs you created.",
+      "Do not rely only on an interface or handoff README path inside the prose prompt; put that path in handoff_files.",
+      "Do not paste large handoff docs, contracts, or work-package maps into coder prompts. Put those files in handoff_files and keep prompt concise.",
+      "Tell coders to read assigned handoff_files first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to you.",
       "Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.",
       "Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.",
     ])
     .use((builder) => withQuestionEscalationProtocol(builder, "orchestrator"))
     .workflow("Coder Redispatch Protocol", [
       "When redispatching, include the original handoff doc path, the coder's blocked question, your answer, any updated contracts, files already changed, and what the coder should continue or avoid.",
+      "When redispatching through task or group, keep the original handoff docs in handoff_files and add any updated contract or clarification docs there too.",
       "If the safe default is obvious and low-risk, record the decision in the handoff docs or final synthesis and proceed without asking the user.",
       "If multiple coders report related blockers, resolve the shared contract once, update the work-package map, then redispatch only the tasks whose scope depends on that answer.",
       "Do not let coder agents invent conflicting contracts.",
@@ -209,7 +214,12 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "input": {
         "description": "Implement core domain module",
         "subagent_type": "coder",
-        "prompt": "Implement the core domain slice. First read docs/orchestration/<feature>/core-domain/README.md. Work primarily in src/core-domain. Respect the public interfaces defined in the handoff doc. Do not edit UI or persistence files unless required by the interface. Return files changed, tests run, questions, risks, and next steps."
+        "handoff_files": [
+          "docs/orchestration/<feature>/work-packages.md",
+          "docs/orchestration/<feature>/contracts.md",
+          "docs/orchestration/<feature>/core-domain/README.md"
+        ],
+        "prompt": "Implement the core domain slice. Work primarily in src/core-domain. Respect the public interfaces defined in the handoff files. Do not edit UI or persistence files unless required by the interface. Return files changed, tests run, questions, risks, and next steps."
       }
     }
   ]

@@ -44,6 +44,10 @@ const BaseParameterFields = {
   description: Schema.String.annotate({ description: "A short (3-5 words) description of the task" }),
   prompt: Schema.String.annotate({ description: "The task for the agent to perform" }),
   subagent_type: Schema.String.annotate({ description: "The type of specialized agent to use for this task" }),
+  handoff_files: Schema.optional(Schema.Array(Schema.NonEmptyString)).annotate({
+    description:
+      "Paths to handoff, interface, contract, or context files the subagent must read before starting. Prefer this over pasting large handoff documents into the prompt.",
+  }),
   task_id: Schema.optional(Schema.String).annotate({
     description:
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
@@ -75,6 +79,21 @@ function renderOutput(input: {
     input.text,
     `</${tag}>`,
     "</task>",
+  ].join("\n")
+}
+
+export function renderPrompt(input: { prompt: string; handoff_files?: readonly string[] }) {
+  const files = [...new Set((input.handoff_files ?? []).map((file) => file.trim()).filter(Boolean))]
+  if (files.length === 0) return input.prompt
+  return [
+    "<handoff_files>",
+    "Read these handoff/context files before doing the task. Treat them as the source of truth; do not ask the orchestrator to paste their contents unless a path is missing or unreadable.",
+    ...files.map((file) => `- ${file}`),
+    "</handoff_files>",
+    "",
+    "<task_prompt>",
+    input.prompt,
+    "</task_prompt>",
   ].join("\n")
 }
 
@@ -173,6 +192,7 @@ export const TaskTool = Tool.define(
         sessionId: nextSession.id,
         model,
         ...(runInBackground ? { background: true } : {}),
+        ...(params.handoff_files?.length ? { handoffFiles: params.handoff_files } : {}),
       }
 
       yield* ctx.metadata({
@@ -184,7 +204,7 @@ export const TaskTool = Tool.define(
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
 
       const runTask = Effect.fn("TaskTool.runTask")(function* () {
-        const parts = yield* ops.resolvePromptParts(params.prompt)
+        const parts = yield* ops.resolvePromptParts(renderPrompt(params))
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
           sessionID: nextSession.id,

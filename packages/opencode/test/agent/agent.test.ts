@@ -219,9 +219,12 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("contract/interface files")
     expect(lower).toContain("handoff readmes")
     expect(lower).toContain("work-package map")
+    expect(lower).toContain("handoff_files arrays for each coder task")
     expect(lower).toContain("before launching multiple coder agents")
     expect(lower).toContain("before coder dispatch")
     expect(lower).toContain("loading the interface skill is not a reason to self-implement")
+    expect(lower).toContain("task input handoff_files array")
+    expect(lower).toContain("do not paste large handoff docs")
     expect(lower).toContain("for real coding work, default to coder agents")
     expect(lower).toContain("do not describe yourself as the sole implementer")
     expect(lower).toContain("do not use being the active agent as a reason to skip coder dispatch")
@@ -265,6 +268,7 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("do not claim completion before reviewing coder output")
     expect(lower).toContain("final responses")
     expect(lower).toContain("what not to touch")
+    expect(lower).toContain("\"handoff_files\"")
     expect(lower).toContain("subagent_type\": \"coder")
     expect(lower).toContain("subagent_type\": \"planner")
   }),
@@ -277,6 +281,7 @@ it.instance("coder prompt requires scoped implementation quality and structured 
     const lower = prompt.toLowerCase()
 
     expect(lower).toContain("interface or handoff readme")
+    expect(lower).toContain("handoff_files")
     expect(lower).toContain("read it first")
     expect(lower).toContain("treat interface contracts as the source of truth")
     expect(lower).toContain("implement the assigned contract")

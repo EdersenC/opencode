@@ -13,6 +13,7 @@ Usage notes:
 8. Inner background tasks are not supported because group waits for foreground completion.
 9. fail_fast is accepted for forward compatibility, but v1 returns all settled nested results because stopping sibling task calls early without changing task/session cleanup could lose result and cancellation accounting.
 10. If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. The caller should answer or ask the user, then redispatch only the affected task.
+11. For nested coder tasks, prefer input.handoff_files for handoff READMEs, interface contracts, work-package maps, and context docs. Keep input.prompt focused on the task goal, scope, constraints, and expected return format instead of pasting large handoff documents.
 
 Example input:
 
@@ -28,6 +29,9 @@ Example input:
       "input": {
         "description": "Implement XYZ interface",
         "subagent_type": "general",
+        "handoff_files": [
+          "docs/orchestration/xyz/contracts.md"
+        ],
         "prompt": "Implement the public TypeScript interface for XYZ. Keep the implementation minimal and type-safe. Return files changed, important decisions, and remaining risks."
       }
     },

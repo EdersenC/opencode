@@ -46,11 +46,13 @@ export function withInterfaceContractProtocol(builder: Builder, target: "orchest
               "Treat this as the required contract-first step before coder dispatch for large multi-agent implementation.",
               "Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.",
               "Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.",
+              "When dispatching coders, pass handoff and contract paths through the task input handoff_files array. Do not paste large handoff docs into coder prompts when the coder can read the files.",
               "If the implementation is tightly coupled, use the interface phase to create ordered handoffs such as contracts/types first, then dependent services, adapters, CLI, UI, tests, or docs. Do not convert tight coupling into a silent single-agent implementation.",
               "Prefer language-native contracts where useful: TypeScript interfaces and types, Go interfaces and structs, Python Protocols or dataclasses, Rust traits and enums, Java/Kotlin/C# interfaces or records, or schemas and public function signatures when the language has no formal interface concept.",
             ]
           : [
-              "If an interface or handoff README path is provided, read it first before inspecting or editing implementation files.",
+              "If the task includes handoff_files, read every listed file first before inspecting or editing implementation files.",
+              "If an interface or handoff README path is provided in the prompt, read it first before inspecting or editing implementation files.",
               "Treat interface contracts as the source of truth.",
               "Implement the assigned contract, not a different local interpretation of the feature.",
               "Avoid changing shared contracts unless explicitly told.",

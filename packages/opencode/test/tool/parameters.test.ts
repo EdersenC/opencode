@@ -188,6 +188,21 @@ describe("tool parameters", () => {
     test("accepts explicit priority", () => {
       expect(parse(Group, { ...valid, priority: "high" }).priority).toBe("high")
     })
+    test("accepts nested task handoff files", () => {
+      const parsed = parse(Group, {
+        ...valid,
+        calls: [
+          {
+            ...valid.calls[0],
+            input: {
+              ...valid.calls[0].input,
+              handoff_files: ["docs/orchestration/feature/contracts.md"],
+            },
+          },
+        ],
+      })
+      expect(parsed.calls[0]?.input.handoff_files).toEqual(["docs/orchestration/feature/contracts.md"])
+    })
     test("rejects missing or empty group fields", () => {
       expect(accepts(Group, { ...valid, name: "" })).toBe(false)
       expect(accepts(Group, { ...valid, description: "" })).toBe(false)
@@ -275,6 +290,15 @@ describe("tool parameters", () => {
     test("accepts optional background flag", () => {
       const parsed = parse(Task, { description: "d", prompt: "p", subagent_type: "general", background: true })
       expect(parsed.background).toBe(true)
+    })
+    test("accepts optional handoff files", () => {
+      const parsed = parse(Task, {
+        description: "d",
+        prompt: "p",
+        subagent_type: "coder",
+        handoff_files: ["docs/orchestration/feature/contracts.md"],
+      })
+      expect(parsed.handoff_files).toEqual(["docs/orchestration/feature/contracts.md"])
     })
     test("rejects missing prompt", () => {
       expect(accepts(Task, { description: "d", subagent_type: "general" })).toBe(false)

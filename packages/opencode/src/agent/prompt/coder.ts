@@ -16,6 +16,7 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
     ])
     .workflow("Core Behavior", [
       "Read the assigned instructions carefully before editing.",
+      "If the task includes a handoff_files section, read every listed file before editing. Treat those files as the compact handoff from the orchestrator.",
       "When editing outside the assigned scope, clearly report why.",
       "Respect existing project style.",
       "Avoid large, unrelated refactors.",

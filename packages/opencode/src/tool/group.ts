@@ -9,6 +9,10 @@ const TaskInput = Schema.Struct({
   description: Schema.NonEmptyString.annotate({ description: "A short description of the nested task" }),
   prompt: Schema.NonEmptyString.annotate({ description: "The task for the subagent to perform" }),
   subagent_type: Schema.NonEmptyString.annotate({ description: "The type of specialized agent to use for this task" }),
+  handoff_files: Schema.optional(Schema.Array(Schema.NonEmptyString)).annotate({
+    description:
+      "Paths to handoff, interface, contract, or context files the nested task must read before starting.",
+  }),
   task_id: Schema.optional(Schema.String).annotate({ description: "Existing task session ID to resume" }),
   command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
   background: Schema.optional(Schema.Boolean).annotate({
@@ -218,6 +222,7 @@ export const GroupTool = Tool.define(
                       description: call.input.description,
                       prompt: call.input.prompt,
                       subagent_type: call.input.subagent_type,
+                      ...(call.input.handoff_files?.length ? { handoff_files: call.input.handoff_files } : {}),
                       ...(call.input.task_id ? { task_id: call.input.task_id } : {}),
                       ...(call.input.command ? { command: call.input.command } : {}),
                     },
