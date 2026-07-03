@@ -185,6 +185,9 @@ export type FooterPromptRoute =
   | { type: "skill" }
   | { type: "model" }
   | { type: "variant" }
+  | { type: "permission-mode" }
+
+export type RunPermissionMode = "ask" | "auto"
 
 export type FooterSubagentTab = {
   sessionID: string

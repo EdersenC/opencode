@@ -11,6 +11,7 @@ import {
   RUN_SUBAGENT_PANEL_ROWS,
   RunCommandMenuBody,
   RunModelSelectBody,
+  RunPermissionModeSelectBody,
   RunQueuedPromptSelectBody,
   RunSkillSelectBody,
   RunSubagentSelectBody,
@@ -26,6 +27,7 @@ import type {
   FooterView,
   RunCommand,
   RunInput,
+  RunPermissionMode,
   RunPrompt,
   RunProvider,
   RunTuiConfig,
@@ -166,6 +168,7 @@ async function renderFooter(
     height?: number
     state?: Partial<FooterState>
     onCycle?: () => void
+    onPermissionModeSelect?: (mode: RunPermissionMode) => void
     onSubmit?: (prompt: RunPrompt) => boolean
   } = {},
 ) {
@@ -175,6 +178,7 @@ async function renderFooter(
   )
   const state = footerState(input.state)
   const config = input.tuiConfig ?? tuiConfig
+  const [autoPermission, setAutoPermission] = createSignal(input.autoPermission ?? false)
   let offKeymap: (() => void) | undefined
 
   function Harness() {
@@ -200,13 +204,17 @@ async function renderFooter(
           theme={input.theme ?? (() => RUN_THEME_FALLBACK)}
           tuiConfig={config}
           backgroundSubagents={input.backgroundSubagents ?? true}
-          autoPermission={input.autoPermission ?? false}
+          autoPermission={autoPermission}
           agent="opencode"
           onSubmit={input.onSubmit ?? (() => true)}
           onPermissionReply={() => {}}
           onQuestionReply={() => {}}
           onQuestionReject={() => {}}
           onCycle={input.onCycle ?? (() => {})}
+          onPermissionModeSelect={(mode) => {
+            setAutoPermission(mode === "auto")
+            input.onPermissionModeSelect?.(mode)
+          }}
           onInterrupt={() => false}
           onEditorOpen={async () => undefined}
           onInputClear={() => {}}
@@ -377,11 +385,13 @@ test("direct command panel renders grouped command palette", async () => {
           queued={() => []}
           variants={variants}
           variantCycle="ctrl+t"
+          permissionMode={() => "ask"}
           onClose={() => {}}
           onModel={() => {}}
           onEditor={() => {}}
           onSkill={() => {}}
           onSubagent={() => {}}
+          onPermissionMode={() => {}}
           onQueued={() => {}}
           onVariant={() => {}}
           onVariantCycle={() => {}}
@@ -408,6 +418,8 @@ test("direct command panel renders grouped command palette", async () => {
     expect(frame).toContain("Prompt")
     expect(frame).toContain("Open editor")
     expect(frame).toContain("/editor")
+    expect(frame).toContain("Permissions")
+    expect(frame).toContain("Approve")
     expect(frame).toContain("Switch model")
     expect(frame).toContain("Skills")
     expect(frame).toContain("/skills")
@@ -419,6 +431,49 @@ test("direct command panel renders grouped command palette", async () => {
     expect(frame).not.toContain("Cycle reasoning effort for future turns")
     expect(frame).not.toContain("Review code")
     expect(frame).not.toContain("Commands 8")
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("direct permission mode panel renders and selects modes", async () => {
+  const [current, setCurrent] = createSignal<RunPermissionMode>("auto")
+  const selected: RunPermissionMode[] = []
+
+  const app = await testRender(
+    () => (
+      <box width={100} height={RUN_COMMAND_PANEL_ROWS}>
+        <RunPermissionModeSelectBody
+          theme={() => RUN_THEME_FALLBACK.footer}
+          current={current}
+          onClose={() => {}}
+          onSelect={(mode) => {
+            selected.push(mode)
+            setCurrent(mode)
+          }}
+        />
+      </box>
+    ),
+    {
+      width: 100,
+      height: RUN_COMMAND_PANEL_ROWS,
+    },
+  )
+
+  try {
+    await app.renderOnce()
+    expect(app.captureCharFrame()).toContain("Permissions")
+    expect(app.captureCharFrame()).toContain("Approve")
+    expect(app.captureCharFrame()).toContain("Auto")
+    expect(app.captureCharFrame()).toContain("current")
+
+    "approve".split("").forEach((key) => app.mockInput.pressKey(key))
+    await app.renderOnce()
+    app.mockInput.pressEnter()
+    await app.renderOnce()
+
+    expect(selected).toEqual(["ask"])
+    expect(current()).toBe("ask")
   } finally {
     app.renderer.destroy()
   }
@@ -518,11 +573,13 @@ test("direct command panel shows subagent entry when available", async () => {
           queued={() => []}
           variants={variants}
           variantCycle="ctrl+t"
+          permissionMode={() => "ask"}
           onClose={() => {}}
           onModel={() => {}}
           onEditor={() => {}}
           onSkill={() => {}}
           onSubagent={() => {}}
+          onPermissionMode={() => {}}
           onQueued={() => {}}
           onVariant={() => {}}
           onVariantCycle={() => {}}
@@ -566,11 +623,13 @@ test("direct command panel keeps completed subagents available", async () => {
           queued={() => []}
           variants={variants}
           variantCycle="ctrl+t"
+          permissionMode={() => "ask"}
           onClose={() => {}}
           onModel={() => {}}
           onEditor={() => {}}
           onSkill={() => {}}
           onSubagent={() => {}}
+          onPermissionMode={() => {}}
           onQueued={() => {}}
           onVariant={() => {}}
           onVariantCycle={() => {}}
@@ -954,13 +1013,14 @@ test("direct footer shows editable prompts and additional queued work while runn
           theme={() => RUN_THEME_FALLBACK}
           tuiConfig={tuiConfig}
           backgroundSubagents={true}
-          autoPermission={false}
+          autoPermission={() => false}
           agent="opencode"
           onSubmit={() => true}
           onPermissionReply={() => {}}
           onQuestionReply={() => {}}
           onQuestionReject={() => {}}
           onCycle={() => {}}
+          onPermissionModeSelect={() => {}}
           onInterrupt={() => false}
           onEditorOpen={async () => undefined}
           onInputClear={() => {}}
@@ -1125,6 +1185,72 @@ test("direct footer shows auto permission mode when enabled", async () => {
     const frame = app.captureCharFrame()
 
     expect(frame).toContain("AUTO · total 1.2s · work 900ms · between 300ms")
+  } finally {
+    app.cleanup()
+  }
+})
+
+test("direct footer /permissions can switch from auto to approve", async () => {
+  const selected: RunPermissionMode[] = []
+  const app = await renderFooter({
+    autoPermission: true,
+    state: { timing: "total 1.2s" },
+    height: RUN_COMMAND_PANEL_ROWS + 1,
+    onPermissionModeSelect: (mode) => selected.push(mode),
+  })
+
+  try {
+    await app.renderOnce()
+    "/permissions".split("").forEach((key) => app.mockInput.pressKey(key))
+    await app.renderOnce()
+    app.mockInput.pressEnter()
+    await app.renderOnce()
+
+    expect(app.captureCharFrame()).toContain("Permissions")
+    expect(app.captureCharFrame()).toContain("Approve")
+    expect(app.captureCharFrame()).toContain("Auto")
+
+    "approve".split("").forEach((key) => app.mockInput.pressKey(key))
+    await app.renderOnce()
+    app.mockInput.pressEnter()
+    await app.renderOnce()
+
+    expect(selected).toEqual(["ask"])
+    expect(app.captureCharFrame()).not.toContain("AUTO · total 1.2s")
+  } finally {
+    app.cleanup()
+  }
+})
+
+test("direct footer command palette opens permissions mode picker", async () => {
+  const selected: RunPermissionMode[] = []
+  const app = await renderFooter({
+    autoPermission: false,
+    state: { timing: "total 1.2s" },
+    height: RUN_COMMAND_PANEL_ROWS + 1,
+    onPermissionModeSelect: (mode) => selected.push(mode),
+  })
+
+  try {
+    await app.renderOnce()
+    app.mockInput.pressKey("p", { ctrl: true })
+    await app.renderOnce()
+    expect(app.captureCharFrame()).toContain("Permissions")
+    expect(app.captureCharFrame()).toContain("Approve")
+
+    "permissions".split("").forEach((key) => app.mockInput.pressKey(key))
+    await app.renderOnce()
+    app.mockInput.pressEnter()
+    await app.renderOnce()
+    expect(app.captureCharFrame()).toContain("Auto")
+
+    "auto".split("").forEach((key) => app.mockInput.pressKey(key))
+    await app.renderOnce()
+    app.mockInput.pressEnter()
+    await app.renderOnce()
+
+    expect(selected).toEqual(["auto"])
+    expect(app.captureCharFrame()).toContain("AUTO · total 1.2s")
   } finally {
     app.cleanup()
   }

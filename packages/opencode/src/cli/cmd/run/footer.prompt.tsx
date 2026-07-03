@@ -20,6 +20,7 @@ import {
   isExitCommand,
   mentionTriggerIndex,
   isNewCommand,
+  isPermissionsCommand,
   movePromptHistory,
   pushPromptHistory,
 } from "./prompt.shared"
@@ -48,7 +49,7 @@ type Auto = RunFooterMenuItem & {
 type SlashOption = RunFooterMenuItem & {
   kind: "slash"
   name: string
-  action?: "skill-menu" | "editor"
+  action?: "skill-menu" | "editor" | "permission-mode"
 }
 
 type PromptOption = Auto | SlashOption
@@ -76,6 +77,7 @@ type PromptInput = {
   onExitRequest?: () => boolean
   onExit: () => void
   onSkillMenu: () => void
+  onPermissionMenu: () => void
   onRows: (rows: number) => void
   onStatus: (text: string) => void
 }
@@ -415,6 +417,13 @@ export function createPromptState(input: PromptInput): PromptState {
         name: "editor",
         display: "/editor",
         description: "compose in your external editor",
+      } satisfies SlashOption,
+      {
+        kind: "slash",
+        action: "permission-mode" as const,
+        name: "permissions",
+        display: "/permissions",
+        description: "switch between Approve and Auto permission modes",
       } satisfies SlashOption,
       { kind: "slash", name: "new", display: "/new", description: "start a new session" } satisfies SlashOption,
       { kind: "slash", name: "exit", display: "/exit", description: "close OpenCode" } satisfies SlashOption,
@@ -859,9 +868,15 @@ export function createPromptState(input: PromptInput): PromptState {
         return
       }
 
+      if (next.action === "permission-mode") {
+        cancelAutocomplete()
+        input.onPermissionMenu()
+        return
+      }
+
       const cursor = area.cursorOffset
       const head = slashHead(area.plainText)
-      const local = !shell() && (next.name === "new" || next.name === "exit")
+      const local = !shell() && (next.name === "new" || next.name === "exit" || next.name === "permissions")
       const separator = !shell() && !local && head && /\s/.test(area.plainText[head.end] ?? "") ? "" : " "
       const text = `/${next.name}${separator}`
 
@@ -970,6 +985,7 @@ export function createPromptState(input: PromptInput): PromptState {
     if (current === "skill") return false
     if (current === "model") return false
     if (current === "variant") return false
+    if (current === "permission-mode") return false
     if (current === "queued-menu") return false
     if (current === "subagent-menu") return false
     return true
@@ -1176,6 +1192,11 @@ export function createPromptState(input: PromptInput): PromptState {
 
     if (!next.text.trim()) {
       input.onStatus(input.state().phase === "running" ? "waiting for current response" : "empty prompt ignored")
+      return
+    }
+
+    if (next.mode !== "shell" && isPermissionsCommand(next.text)) {
+      input.onPermissionMenu()
       return
     }
 

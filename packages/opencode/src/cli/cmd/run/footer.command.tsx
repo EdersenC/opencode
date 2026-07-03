@@ -5,7 +5,7 @@ import fuzzysort from "fuzzysort"
 import { createEffect, createMemo, createSignal, type Accessor } from "solid-js"
 import { RunFooterMenu, createFooterMenuState, type RunFooterMenuItem } from "./footer.menu"
 import type { RunFooterTheme } from "./theme"
-import type { FooterQueuedPrompt, FooterSubagentTab, RunCommand, RunInput, RunProvider } from "./types"
+import type { FooterQueuedPrompt, FooterSubagentTab, RunCommand, RunInput, RunPermissionMode, RunProvider } from "./types"
 
 type PanelEntry = RunFooterMenuItem & {
   category: string
@@ -18,6 +18,7 @@ type CommandEntry =
   | (PanelEntry & { action: "skill" })
   | (PanelEntry & { action: "queued" })
   | (PanelEntry & { action: "subagent" })
+  | (PanelEntry & { action: "permission-mode" })
   | (PanelEntry & { action: "variant.cycle" })
   | (PanelEntry & { action: "variant.list" })
   | (PanelEntry & { action: "slash"; name: string })
@@ -41,6 +42,11 @@ type SkillEntry = PanelEntry & {
 
 type SubagentEntry = PanelEntry & {
   sessionID: string
+  current: boolean
+}
+
+type PermissionModeEntry = PanelEntry & {
+  mode: RunPermissionMode
   current: boolean
 }
 
@@ -338,11 +344,13 @@ export function RunCommandMenuBody(props: {
   queued: Accessor<FooterQueuedPrompt[]>
   variants: Accessor<string[]>
   variantCycle: string
+  permissionMode: Accessor<RunPermissionMode>
   onClose: () => void
   onModel: () => void
   onEditor: () => void
   onSkill: () => void
   onSubagent: () => void
+  onPermissionMode: () => void
   onQueued: () => void
   onVariant: () => void
   onVariantCycle: () => void
@@ -355,7 +363,7 @@ export function RunCommandMenuBody(props: {
   const skills = createMemo(() => (props.commands() ?? []).filter((item) => item.source === "skill"))
   const activeSubagentCount = createMemo(() => props.subagents().filter((item) => item.status === "running").length)
   const entries = createMemo<CommandEntry[]>(() => {
-    const builtins = ["editor", "new"]
+    const builtins = ["editor", "new", "permissions"]
     const session: CommandEntry[] = [
       {
         action: "editor",
@@ -379,6 +387,13 @@ export function RunCommandMenuBody(props: {
             },
           ]
         : []),
+      {
+        action: "permission-mode",
+        category: "Session",
+        display: "Permissions",
+        footer: props.permissionMode() === "auto" ? "AUTO" : "Approve",
+        keywords: "permissions permission approve approval ask auto mode",
+      },
       {
         action: "slash",
         category: "Session",
@@ -489,6 +504,11 @@ export function RunCommandMenuBody(props: {
       return
     }
 
+    if (item.action === "permission-mode") {
+      props.onPermissionMode()
+      return
+    }
+
     if (item.action === "queued") {
       props.onQueued()
       return
@@ -568,6 +588,110 @@ export function RunCommandMenuBody(props: {
         grouped={!query().trim()}
         background
         headerColor={props.theme().muted}
+      />
+    </PanelShell>
+  )
+}
+
+export function RunPermissionModeSelectBody(props: {
+  theme: Accessor<RunFooterTheme>
+  current: Accessor<RunPermissionMode>
+  onClose: () => void
+  onSelect: (mode: RunPermissionMode) => void
+  onRows?: (rows: number) => void
+}) {
+  let field: InputRenderable | undefined
+  const [query, setQuery] = createSignal("")
+  const entries = createMemo<PermissionModeEntry[]>(() => [
+    {
+      category: "",
+      display: "Approve",
+      description: props.current() === "ask" ? "current" : "ask before running permissioned actions",
+      footer: props.current() === "ask" ? "current" : "manual",
+      keywords: "approve approval ask prompt manual permissions",
+      mode: "ask",
+      current: props.current() === "ask",
+    },
+    {
+      category: "",
+      display: "Auto",
+      description:
+        props.current() === "auto"
+          ? "current"
+          : "auto-approve safe project-local bash commands; risky actions still ask",
+      footer: props.current() === "auto" ? "current" : "safe local",
+      keywords: "auto automatic project local bash tests build lint permissions",
+      mode: "auto",
+      current: props.current() === "auto",
+    },
+  ])
+  const items = createMemo<PermissionModeEntry[]>(() => match(query(), entries()))
+  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
+  const select = () => {
+    const item = items()[menu.selected()]
+    if (!item) {
+      return
+    }
+
+    props.onSelect(item.mode)
+  }
+
+  createEffect(() => {
+    query()
+    menu.reset()
+  })
+
+  createEffect(() => {
+    if (query().trim()) {
+      return
+    }
+
+    const index = items().findIndex((item) => item.current)
+    if (index !== -1) {
+      menu.reveal(index)
+    }
+  })
+
+  createEffect(() => {
+    props.onRows?.(menu.rows() + PANEL_FRAME_ROWS)
+  })
+
+  useKeyboard((event) => {
+    if (event.defaultPrevented) {
+      return
+    }
+
+    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
+  })
+
+  return (
+    <PanelShell
+      title="Permissions"
+      query={query()}
+      count={items().length}
+      total={entries().length}
+      placeholder="Search"
+      theme={props.theme}
+      inputRef={(input) => {
+        field = input
+      }}
+      onQuery={setQuery}
+      dark
+      chrome="minimal"
+    >
+      <RunFooterMenu
+        theme={props.theme}
+        items={items}
+        selected={menu.selected}
+        offset={menu.offset}
+        rows={menu.rows}
+        limit={PANEL_LIST_ROWS}
+        empty="No permission modes"
+        border={false}
+        paddingLeft={PANEL_PAD}
+        paddingRight={PANEL_PAD}
+        grouped={false}
+        background
       />
     </PanelShell>
   )

@@ -21,7 +21,15 @@ import { resolveModelInfo, resolveRunTuiConfig, resolveSessionInfo } from "./run
 import { createRuntimeLifecycle } from "./runtime.lifecycle"
 import { trace } from "./trace"
 import { cycleVariant, formatModelLabel, resolveSavedVariant, resolveVariant, saveVariant } from "./variant.shared"
-import type { LocalReplayAnchor, LocalReplayRow, RunInput, RunPrompt, RunProvider, StreamCommit } from "./types"
+import type {
+  LocalReplayAnchor,
+  LocalReplayRow,
+  RunInput,
+  RunPermissionMode,
+  RunPrompt,
+  RunProvider,
+  StreamCommit,
+} from "./types"
 
 /** @internal Exported for testing */
 export { pickVariant, resolveVariant } from "./variant.shared"
@@ -130,6 +138,7 @@ type RuntimeState = {
   sessionID: string
   history: RunPrompt[]
   localRows: LocalReplayRow[]
+  autoPermission: boolean
   sessionTitle?: string
   agent: string | undefined
   switching?: Promise<void>
@@ -208,6 +217,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
     sessionID: ctx.sessionID,
     history: [...session.history],
     localRows: [],
+    autoPermission: input.autoPermission,
     sessionTitle: ctx.sessionTitle,
     agent: ctx.agent,
   }
@@ -248,6 +258,9 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
     tuiConfig,
     backgroundSubagents: input.backgroundSubagents,
     autoPermission: input.autoPermission,
+    onPermissionModeSelect: (mode: RunPermissionMode) => {
+      state.autoPermission = mode === "auto"
+    },
     onPermissionReply: async (next) => {
       if (state.demo?.permission(next)) {
         return
@@ -487,31 +500,33 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         providers: () => state.providers,
         footer,
         trace: log,
-        onAutoPermission: input.autoPermission
-          ? (request) => {
-              if (canAutoApproveRequest(request)) {
-                void ctx.sdk.permission
-                  .reply({
-                    requestID: request.id,
-                    reply: "once",
-                  })
-                  .catch(() => {})
-                return true
-              }
+        onAutoPermission: (request) => {
+          if (!state.autoPermission) {
+            return false
+          }
 
-              if (canAutoDenyRequest(request)) {
-                void ctx.sdk.permission
-                  .reply({
-                    requestID: request.id,
-                    reply: "reject",
-                  })
-                  .catch(() => {})
-                return true
-              }
+          if (canAutoApproveRequest(request)) {
+            void ctx.sdk.permission
+              .reply({
+                requestID: request.id,
+                reply: "once",
+              })
+              .catch(() => {})
+            return true
+          }
 
-              return false
-            }
-          : undefined,
+          if (canAutoDenyRequest(request)) {
+            void ctx.sdk.permission
+              .reply({
+                requestID: request.id,
+                reply: "reject",
+              })
+              .catch(() => {})
+            return true
+          }
+
+          return false
+        },
       })
       if (footer.isClosed) {
         await handle.close()
