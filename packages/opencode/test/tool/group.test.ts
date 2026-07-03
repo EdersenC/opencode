@@ -11,6 +11,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { GroupTool, Parameters as GroupParameters } from "../../src/tool/group"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { withMode } from "@/permission/auto"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -490,6 +491,42 @@ describe("tool.group", () => {
       expect(asks).toEqual([
         expect.objectContaining({ permission: "group", patterns: ["feature-implementation"] }),
         expect.objectContaining({ permission: "task", patterns: ["general"] }),
+      ])
+    }),
+  )
+
+  it.instance("does not strip auto permission mode from group or nested task asks", () =>
+    Effect.gen(function* () {
+      const seedResult = yield* seed()
+      const asks: unknown[] = []
+      const promptOps: TaskPromptOps = {
+        cancel: () => Effect.void,
+        resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+        prompt: (promptInput) => Effect.succeed(reply(promptInput, "done")),
+      }
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+      yield* def.execute(input({ priority: "high" }), {
+        ...context(seedResult, promptOps),
+        ask: (value) =>
+          Effect.sync(() => {
+            asks.push({
+              ...value,
+              metadata: withMode(value.metadata, "auto"),
+            })
+          }),
+      })
+
+      expect(asks).toEqual([
+        expect.objectContaining({
+          permission: "group",
+          metadata: expect.objectContaining({ permissionMode: "auto" }),
+        }),
+        expect.objectContaining({
+          permission: "task",
+          patterns: ["general"],
+          metadata: expect.objectContaining({ permissionMode: "auto" }),
+        }),
       ])
     }),
   )

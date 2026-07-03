@@ -716,7 +716,7 @@ For example, to ensure that the `edit` and `bash` tools require user approval:
 }
 ```
 
-To auto-approve safe project-local bash requests that would otherwise ask, set `permission_mode`:
+To auto-approve normal project-local development commands that would otherwise ask, set `permission_mode`:
 
 ```json title="opencode.json"
 {
@@ -725,7 +725,7 @@ To auto-approve safe project-local bash requests that would otherwise ask, set `
 }
 ```
 
-Explicit deny rules still win, and unsafe or external commands still require approval.
+AUTO is intended for trusted local repositories where agents need to run tests, builds, linters, formatters, and other workspace-scoped commands frequently. It does not mean unrestricted shell access: explicit deny rules still win, and commands that escape the project directory, publish/deploy externally, push to remotes, or perform privileged system mutation still require approval or are denied.
 
 [Learn more about permissions here](/docs/permissions).
 

@@ -157,7 +157,7 @@ it.instance("planner agent is a read-only native planning subagent", () =>
     expect(evalPerm(planner, "grep")).toBe("allow")
     expect(evalPerm(planner, "webfetch")).toBe("allow")
     expect(evalPerm(planner, "websearch")).toBe("allow")
-    expect(evalPerm(planner, "bash")).toBe("ask")
+    expect(evalPerm(planner, "bash")).toBe("deny")
     expect(evalPerm(planner, "edit")).toBe("deny")
     expect(evalPerm(planner, "write")).toBe("deny")
     expect(evalPerm(planner, "apply_patch")).toBe("deny")
@@ -359,6 +359,28 @@ it.instance("plan agent denies edits except .opencode/plans/*", () =>
     // But specific path is allowed
     expect(Permission.evaluate("edit", ".opencode/plans/foo.md", plan!.permission).action).toBe("allow")
   }),
+)
+
+it.instance(
+  "auto permission mode does not weaken plan or planner read-only restrictions",
+  () =>
+    Effect.gen(function* () {
+      const plan = yield* load((svc) => svc.get("plan"))
+      const planner = yield* load((svc) => svc.get("planner"))
+      expect(plan).toBeDefined()
+      expect(planner).toBeDefined()
+      expect(evalPerm(plan, "edit")).toBe("deny")
+      expect(evalPerm(plan, "bash")).toBe("deny")
+      expect(evalPerm(plan, "write")).toBe("deny")
+      expect(evalPerm(plan, "apply_patch")).toBe("deny")
+      expect(evalPerm(planner, "edit")).toBe("deny")
+      expect(evalPerm(planner, "bash")).toBe("deny")
+      expect(evalPerm(planner, "write")).toBe("deny")
+      expect(evalPerm(planner, "apply_patch")).toBe("deny")
+      expect(evalPerm(planner, "task")).toBe("deny")
+      expect(evalPerm(planner, "group")).toBe("deny")
+    }),
+  { config: { permission_mode: "auto" } },
 )
 
 it.instance("plan agent denies the general subagent by default", () =>

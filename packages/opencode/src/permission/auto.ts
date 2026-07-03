@@ -30,8 +30,13 @@ type PermissionLike = {
 const REMOTE_PIPE =
   /\b(curl|wget|iwr|Invoke-WebRequest)\b[\s\S]*\|\s*(sh|bash|zsh|fish|pwsh|powershell|iex|Invoke-Expression)\b/i
 const FORK_BOMB = /:\s*\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;?\s*:/
+const RM_RECURSIVE_FORCE =
+  String.raw`(?:-[^\s]*r[^\s]*f[^\s]*|-[^\s]*f[^\s]*r[^\s]*|-[^\s]*r[^\s]*\s+-[^\s]*f|-[^\s]*f[^\s]*\s+-[^\s]*r)`
 const DESTRUCTIVE_ROOT =
-  /(^|[;&|]\s*)(sudo\s+)?rm\s+(?:-[^\s]*r[^\s]*f[^\s]*|-[^\s]*f[^\s]*r[^\s]*|-[^\s]*r[^\s]*\s+-[^\s]*f|-[^\s]*f[^\s]*\s+-[^\s]*r)\s+(?:--\s+)?(\/(?:\*+)?|~|\$HOME|\$\{HOME\}|\.\.)(?=$|[\s;&|])/i
+  new RegExp(
+    String.raw`(^|[;&|]\s*)(sudo\s+)?rm\s+${RM_RECURSIVE_FORCE}\s+(?:--\s+)?["']?(\/(?:\*+)?|~|\$HOME|\$\{HOME\}|\.\.|[A-Za-z]:[\\/](?:\*+)?)["']?(?=$|[\s;&|])`,
+    "i",
+  )
 const PERMISSION_SYSTEM_MUTATION =
   /(^|[;&|]\s*)(sudo\s+)?(chmod|chown)\s+[\s\S]*(\/$|\/etc\b|\/usr\b|\/bin\b|\/sbin\b|\/var\b|\/Library\b|[A-Za-z]:[\\/](Windows|Program Files)\b)/i
 const PRIVILEGED = /(^|[;&|]\s*)(sudo|su|doas)\b/i
@@ -39,6 +44,8 @@ const GLOBAL_PACKAGE_INSTALL =
   /(^|[;&|]\s*)(npm|pnpm|yarn|bun)\s+(install|add|i)\b(?=[\s\S]*\s(-g|--global)(\s|$))/i
 const PUBLISH = /(^|[;&|]\s*)(npm|pnpm|yarn|bun|cargo)\s+publish\b/i
 const GIT_PUSH = /(^|[;&|]\s*)git\s+push\b/i
+const EXTERNAL_SCRIPT =
+  /(^|[;&|]\s*)((npm|pnpm|yarn|bun)\s+((run|run-script)\s+)?[^\s;&|]*(deploy|publish|release|push|upload|ship|terraform|kubectl|docker|serverless|sls|sst|cdk|vercel|firebase|heroku|fly|flyctl|gcloud|aws|az|helm)[^\s;&|]*|make\s+[^\s;&|]*(deploy|publish|release|push|upload|ship|terraform|kubectl|docker|serverless|sls|sst|cdk|vercel|firebase|heroku|fly|flyctl|gcloud|aws|az|helm)[^\s;&|]*)/i
 const EXTERNAL_MUTATION =
   /(^|[;&|]\s*)(terraform\s+(apply|destroy)|kubectl\s+(apply|delete|replace|patch|scale|rollout|cordon|drain)|docker\s+(push|run|compose|buildx)|podman\s+(push|run)|gh\s+release\s+create|flyctl\b|vercel\b|firebase\b|heroku\b|sls\b|serverless\b|sst\b|cdk\b|aws\b|az\b|gcloud\b|doctl\b|helm\b)/i
 const REMOTE_DOWNLOAD = /(^|[;&|]\s*)(curl|wget|iwr|Invoke-WebRequest)\b/i
@@ -49,6 +56,7 @@ const AMBIGUOUS_DELETE =
   /(^|[;&|]\s*)rm\s+(?:-[^\s]*r[^\s]*f[^\s]*|-[^\s]*f[^\s]*r[^\s]*|-[^\s]*r[^\s]*\s+-[^\s]*f|-[^\s]*f[^\s]*\s+-[^\s]*r)\s+(?:--\s+)?(\.|\*)(?=$|[\s;&|])/i
 const SYSTEM_PATH =
   /(^|\s)(\/etc|\/usr|\/bin|\/sbin|\/var|\/opt|\/root|\/tmp|\/Library|~|\$HOME\b|\$\{HOME\}|[A-Za-z]:[\\/](Windows|Program Files))\b/i
+const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/
 
 const LOCAL_COMMANDS = new Set([
   "[",
@@ -230,6 +238,7 @@ function askRule(command: string) {
   if (GLOBAL_PACKAGE_INSTALL.test(command)) return { reason: "global package install", rule: "global-package-install" }
   if (PUBLISH.test(command)) return { reason: "package publish", rule: "package-publish" }
   if (GIT_PUSH.test(command)) return { reason: "git push", rule: "git-push" }
+  if (EXTERNAL_SCRIPT.test(command)) return { reason: "external package script or make target", rule: "external-script" }
   if (EXTERNAL_MUTATION.test(command)) return { reason: "external deployment or service mutation", rule: "external-mutation" }
   if (REMOTE_DOWNLOAD.test(command)) return { reason: "remote download command", rule: "remote-download" }
   if (DIRECTORY_ESCAPE.test(command)) return { reason: "command changes directory outside project root", rule: "directory-escape" }
@@ -240,6 +249,12 @@ function askRule(command: string) {
 
 function outsidePathReference(command: string, cwd: string, projectRoot: string) {
   for (const reference of pathReferences(command)) {
+    if (process.platform !== "win32" && WINDOWS_ABSOLUTE.test(reference)) {
+      return {
+        reason: "command references Windows absolute path outside project root",
+        rule: `path:${reference}`,
+      }
+    }
     const resolved = resolveReference(reference, cwd)
     if (!resolved) continue
     if (inside(projectRoot, resolved)) continue
