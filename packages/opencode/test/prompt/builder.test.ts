@@ -118,6 +118,16 @@ Do not over-orchestrate small tasks.`)
     expect(builder.compile({ modelSize: "small" })).toContain("Keep sections compact.")
   })
 
+  test("supports reusable builder transforms", () => {
+    const prompt = PromptBuilder.create("packed")
+      .role("Role.")
+      .use((builder) => builder.workflow("Packed Workflow", ["Inspect", "Verify"]))
+      .compile()
+
+    expect(prompt).toContain("## Packed Workflow")
+    expect(prompt).toContain("- Verify")
+  })
+
   test("handles string arrays consistently", () => {
     const prompt = PromptBuilder.create("arrays").goal(["First item", "Second item\nwith detail"]).compile()
 

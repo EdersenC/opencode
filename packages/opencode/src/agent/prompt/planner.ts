@@ -39,6 +39,27 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
       "The verification strategy should name practical tests, typechecks, builds, or manual checks.",
       "Risks and open questions should be specific enough for the orchestrator to decide whether to ask the user.",
     ])
+    .when({ profile: ["explicit", "debug"] }, (builder) =>
+      builder.segment({
+        id: "planner:explicit-checklist",
+        kind: "workflow",
+        title: "Explicit Planning Checklist",
+        content: [
+          "Summarize repo state.",
+          "List assumptions.",
+          "Pick one architecture.",
+          "Break work into ordered implementation phases.",
+          "Name files likely affected.",
+          "Name verification commands or checks.",
+          "Name risks and open questions.",
+        ],
+      }),
+    )
+    .when({ profile: "reasoning" }, (builder) =>
+      builder.modelNote("Keep the plan concise and strategic, but preserve concrete phases, file impact, verification, risks, and open questions.", {
+        title: "Reasoning Profile Note",
+      }),
+    )
     .outputFormat(`<plan>
 <title>...</title>
 <angle>minimal | robust | risk-first | integration-first | custom</angle>

@@ -15,10 +15,13 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("multi-plan workflow")
     expect(lower).toContain("contract-first interface phase")
     expect(lower).toContain("implementation dispatch protocol")
-    expect(lower).toContain("coder question handling protocol")
+    expect(lower).toContain("question and blocker protocol")
+    expect(lower).toContain("review loop")
     expect(lower).toContain("review and reconcile coder output")
     expect(lower).toContain("verification")
     expect(lower).toContain("final response format")
+    expect(lower).toContain("interface contract protocol")
+    expect(lower).toContain("code quality bar")
     expect(lower).toContain("for tiny edits")
     expect(lower).toContain("subagent_type\": \"planner")
     expect(lower).toContain("subagent_type\": \"coder")
@@ -52,6 +55,9 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("keep future change in mind without overengineering")
     expect(lower).toContain("blocked result format")
     expect(lower).toContain("completed result format")
+    expect(lower).toContain("interface contract protocol")
+    expect(lower).toContain("question and blocker protocol")
+    expect(lower).toContain("code quality bar")
   })
 
   test("compiled prompts are deterministic", () => {
@@ -69,9 +75,37 @@ describe("agent prompt factories", () => {
   test("previewAgentPrompt returns compiled prompts with options", () => {
     const prompt = previewAgentPrompt("orchestrate", { includeExamples: false, includeDebugMarkers: true })
 
-    expect(prompt).toContain('[segment id="orchestrate:role:0" kind="role"]')
+    expect(prompt).toContain("<!-- prompt-segment: orchestrate:role:0 kind=role -->")
     expect(prompt).toContain("## Multi-Plan Workflow")
     expect(prompt).not.toContain("## Example: multi-plan group call")
+  })
+
+  test("prompt profiles tune prompt length and detail", () => {
+    const standard = createOrchestratePrompt({ profile: "standard" })
+    const compact = createOrchestratePrompt({ profile: "compact" })
+    const explicit = createOrchestratePrompt({ profile: "explicit" })
+
+    expect(compact.length).toBeLessThan(standard.length)
+    expect(compact).not.toContain("## Example: multi-plan group call")
+    expect(compact).not.toContain("## Clarification Pressure")
+    expect(explicit).toContain("## Explicit Orchestration Checklist")
+    expect(explicit).toContain("## Explicit Interface Contract Checklist")
+    expect(explicit).toContain("## Explicit Code Quality Checklist")
+  })
+
+  test("worker profiles include stricter checklists for explicit prompts", () => {
+    const coder = createCoderPrompt({ profile: "explicit" })
+    const planner = createPlannerPrompt({ profile: "explicit" })
+
+    expect(coder).toContain("## Explicit Code Quality Checklist")
+    expect(coder).toContain("## Explicit Interface Contract Checklist")
+    expect(planner).toContain("## Explicit Planning Checklist")
+  })
+
+  test("debug markers appear only when enabled", () => {
+    expect(createCoderPrompt()).not.toContain("<!-- prompt-segment:")
+    expect(createCoderPrompt({ includeDebugMarkers: true })).toContain("<!-- prompt-segment:")
+    expect(createCoderPrompt({ profile: "debug" })).toContain("<!-- prompt-segment:")
   })
 })
 

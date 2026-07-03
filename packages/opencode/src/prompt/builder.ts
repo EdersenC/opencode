@@ -1,3 +1,6 @@
+import { applyPromptProfile } from "./profile"
+import type { PromptProfileName } from "./profile"
+
 export type PromptSegmentKind =
   | "role"
   | "goal"
@@ -25,6 +28,7 @@ export type PromptSegment = {
 }
 
 export type PromptBuildOptions = {
+  profile?: PromptProfileName
   model?: string
   modelSize?: "small" | "medium" | "large" | "reasoning" | "unknown"
   agent?: string
@@ -50,6 +54,7 @@ export type PromptModelNoteOptions = {
 export type PromptCondition =
   | ((options: PromptBuildOptions) => boolean)
   | {
+      profile?: PromptProfileName | PromptProfileName[]
       model?: string | string[]
       modelSize?: PromptBuildOptions["modelSize"] | Array<NonNullable<PromptBuildOptions["modelSize"]>>
       agent?: string | string[]
@@ -162,13 +167,18 @@ export namespace PromptBuilder {
       )
     }
 
+    use(apply: (builder: Builder) => Builder) {
+      return apply(this)
+    }
+
     compile(options: PromptBuildOptions = {}) {
-      const gap = options.compact ? "\n" : "\n\n"
+      const buildOptions = applyPromptProfile(options)
+      const gap = buildOptions.compact ? "\n" : "\n\n"
       return orderEntries(
-        this.entries.filter((entry) => includeEntry(entry, options)),
-        options,
+        this.entries.filter((entry) => includeEntry(entry, buildOptions)),
+        buildOptions,
       )
-        .map((entry) => renderSegment(entry.segment, options))
+        .map((entry) => renderSegment(entry.segment, buildOptions))
         .filter((item) => item.length > 0)
         .join(gap)
     }
@@ -222,6 +232,7 @@ function includeModelNote(segment: PromptSegment, options: PromptBuildOptions) {
 
 function includeCondition(condition: PromptCondition, options: PromptBuildOptions): boolean {
   if (typeof condition === "function") return condition(options)
+  if (!matchesValue(options.profile, condition.profile)) return false
   if (!matchesValue(options.model, condition.model)) return false
   if (!matchesValue(options.modelSize, condition.modelSize)) return false
   if (!matchesValue(options.agent, condition.agent)) return false
@@ -248,7 +259,7 @@ function matchesValue(value: string | undefined, expected: unknown) {
 function renderSegment(segment: PromptSegment, options: PromptBuildOptions) {
   const gap = options.compact ? "\n" : "\n\n"
   return [
-    options.includeDebugMarkers ? `[segment id="${segment.id}" kind="${segment.kind}"]` : "",
+    options.includeDebugMarkers ? `<!-- prompt-segment: ${segment.id} kind=${segment.kind} -->` : "",
     renderHeading(segment),
     renderContent(segment.content),
   ]

@@ -64,9 +64,10 @@ const GeneratedAgent = Schema.Struct({
   systemPrompt: Schema.String,
 })
 
-const PROMPT_ORCHESTRATE = createOrchestratePrompt()
-const PROMPT_CODER = createCoderPrompt()
-const PROMPT_PLANNER = createPlannerPrompt()
+// TODO: Thread provider/model metadata into prompt factories when native agent prompts are compiled per session.
+const PROMPT_ORCHESTRATE = createOrchestratePrompt({ agent: "orchestrate" })
+const PROMPT_CODER = createCoderPrompt({ agent: "coder" })
+const PROMPT_PLANNER = createPlannerPrompt({ agent: "planner" })
 
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>

@@ -1,4 +1,10 @@
 import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
+import {
+  withCodeQualityBar,
+  withInterfaceContractProtocol,
+  withQuestionEscalationProtocol,
+  withWorkerResultFormat,
+} from "@/prompt/packs"
 
 export function createCoderPrompt(options: PromptBuildOptions = {}) {
   return PromptBuilder.create("coder")
@@ -10,23 +16,12 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
     ])
     .workflow("Core Behavior", [
       "Read the assigned instructions carefully before editing.",
-      "If an interface or handoff README path is provided, read it first before inspecting or editing implementation files.",
-      "Treat interface contracts as the source of truth.",
-      "Stay inside the assigned scope unless a change outside scope is required to keep the repo correct.",
       "When editing outside the assigned scope, clearly report why.",
       "Respect existing project style.",
       "Avoid large, unrelated refactors.",
     ])
-    .qualityBar([
-      "Prefer reusable, composable code.",
-      "Prefer clear boundaries between modules.",
-      "Prefer explicit types, narrow interfaces, and small cohesive functions.",
-      "Code should read like a well-structured technical narrative: each file should have a clear purpose, each abstraction should have a reason, and the flow should be easy to follow.",
-      "Document public interfaces when useful and clarify intent, invariants, public API behavior, or non-obvious decisions.",
-      "Do not add noisy comments that restate obvious code.",
-      "Keep future change in mind without overengineering. Avoid hard-coding decisions that are likely to change.",
-      "Prefer dependency injection, adapters, interfaces, protocols, traits, or similar patterns where appropriate for the language.",
-    ])
+    .use((builder) => withInterfaceContractProtocol(builder, "worker"))
+    .use(withCodeQualityBar)
     .workflow("Testing And Verification", [
       "Add or update tests where practical.",
       "Run focused verification commands when safe.",
@@ -44,109 +39,9 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
       "The orchestrator may give one directory, multiple directories, or specific files.",
       "Treat assigned directories and files as the primary ownership boundary.",
       "Avoid touching files owned by another coder unless the interface contract requires it.",
-      "Avoid changing shared contracts unless explicitly told.",
-      "Continue independently when ambiguity has a safe local default that does not change public behavior, shared contracts, or another coder's scope.",
-      "Escalate only material blockers. Do not ask low-value questions whose answer can be inferred from repo context, the selected plan, interface docs, or existing conventions.",
-    ])
-    .workflow("Question Escalation", [
-      "If a contract is wrong, incomplete, or insufficient for safe implementation, report a structured question to the orchestrator instead of silently inventing incompatible behavior.",
-      "Stop and return a blocked result when continuing would create a bad interface, conflicting work, irreversible product behavior, or a dependency choice the orchestrator or user must own.",
-      "When blocked, provide concrete options and a safe default whenever possible.",
       "Do not spawn task or group subagents.",
-      "Do not use the user-facing question tool or ask the user directly unless the architecture explicitly allows it and the orchestrator has granted it.",
-      "If there is a conflict, missing interface contract, unclear requirement, or ambiguity that blocks safe implementation, report a structured question to the orchestrator.",
     ])
-    .segment({
-      id: "coder:blocked-result-format",
-      kind: "output_format",
-      title: "Blocked Result Format",
-      content: `Use the normal completed return format when you can finish safely. If implementation is blocked, return only this structure:
-
-<coder_result state="blocked">
-<summary>
-Implementation is blocked by one or more questions.
-</summary>
-<scope_received>
-...
-</scope_received>
-<files_inspected>
-- ...
-</files_inspected>
-<partial_work_completed>
-...
-</partial_work_completed>
-<questions_for_orchestrator>
-<question priority="high" type="contract">
-...
-</question>
-<question priority="medium" type="product">
-...
-</question>
-</questions_for_orchestrator>
-<recommended_options>
-<option id="A">
-...
-</option>
-<option id="B">
-...
-</option>
-</recommended_options>
-<safe_default>
-...
-</safe_default>
-</coder_result>`,
-    })
-    .context("Question Categories", [
-      "contract: interface or handoff doc is incomplete, contradictory, or wrong",
-      "product: user-facing behavior is unclear",
-      "architecture: selected plan has ambiguity",
-      "integration: external API, dependency, environment, or platform is unclear",
-      "conflict: assigned scope conflicts with another coder's work",
-      "test: expected validation is unclear",
-    ])
-    .segment({
-      id: "coder:completed-result-format",
-      kind: "output_format",
-      title: "Completed Result Format",
-      content: `<coder_result>
-<summary>
-...
-</summary>
-<scope_received>
-...
-</scope_received>
-<interface_docs_read>
-- ...
-</interface_docs_read>
-<files_inspected>
-- ...
-</files_inspected>
-<files_changed>
-- ...
-</files_changed>
-<implementation_notes>
-...
-</implementation_notes>
-<quality_notes>
-...
-</quality_notes>
-<deviations_from_interface_docs>
-- ...
-</deviations_from_interface_docs>
-<tests_run>
-- command: ...
-  result: ...
-</tests_run>
-<questions_for_orchestrator>
-- ...
-</questions_for_orchestrator>
-<risks>
-- ...
-</risks>
-<next_steps>
-- ...
-</next_steps>
-</coder_result>`,
-    })
+    .use((builder) => withQuestionEscalationProtocol(builder, "worker"))
+    .use(withWorkerResultFormat)
     .compile(options)
 }

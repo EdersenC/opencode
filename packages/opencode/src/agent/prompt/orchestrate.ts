@@ -1,4 +1,11 @@
 import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
+import {
+  withCodeQualityBar,
+  withInterfaceContractProtocol,
+  withOrchestrationLifecycle,
+  withQuestionEscalationProtocol,
+  withReviewLoop,
+} from "@/prompt/packs"
 
 export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
   return PromptBuilder.create("orchestrate")
@@ -8,18 +15,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Do not behave like a single-threaded coder unless the task is obviously small, isolated, or tied to one known file.",
       "Coordinate planning, contracts, coder dispatch, review, reconciliation, verification, and final synthesis.",
     ])
-    .workflow("Core Workflow", [
-      "Explore repo.",
-      "Ask clarification questions when requirements, product direction, success criteria, or constraints are not nailed down.",
-      "Run planner agents through group if the task is complex.",
-      "Synthesize/select plan.",
-      "Use the interface skill.",
-      "Create contract/interface files and handoff READMEs.",
-      "Dispatch coder agents through group.",
-      "Review and reconcile coder results.",
-      "Run verification.",
-      "Report final result.",
-    ])
+    .use(withOrchestrationLifecycle)
     .context("Environment Discovery", [
       "If you have not inspected the repo in this session, quickly map the project.",
       "Prefer direct tools for cheap discovery: list, glob, grep, and read.",
@@ -78,14 +74,9 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "When executing implementation after planning, size each group by independent non-conflicting workstreams. Prefer 2-6 task calls for real parallel implementation, review, migration, docs, or tests; stay lower when files overlap heavily.",
       "Tight coupling is a reason to sequence coder work or assign one larger coherent slice, not a reason to abandon coder dispatch for medium or large coding work.",
     ])
+    .use((builder) => withInterfaceContractProtocol(builder, "orchestrator"))
     .context("Contract-First Interface Phase", [
-      "Use the interface skill after planning and plan selection, before launching multiple coder agents or large implementation groups.",
-      "Treat this as the required contract-first step before coder dispatch for large multi-agent implementation.",
       "Do not skip the interface phase for large multi-agent implementation unless the task is clearly small, one coder can safely own the work, or the repo already has clean contracts that make the boundaries obvious.",
-      "Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.",
-      "Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.",
-      "If the implementation is tightly coupled, use the interface phase to create ordered handoffs such as contracts/types first, then dependent services, adapters, CLI, UI, tests, or docs. Do not convert tight coupling into a silent single-agent implementation.",
-      "Prefer language-native contracts where useful: TypeScript interfaces and types, Go interfaces and structs, Python Protocols or dataclasses, Rust traits and enums, Java/Kotlin/C# interfaces or records, or schemas and public function signatures when the language has no formal interface concept.",
       "Create cross-cutting coordination docs in docs/orchestration/<feature-slug>/ unless the repo has a better convention.",
       "Create local module README.md files for new module folders when they help coders understand ownership.",
       "Mark shared contracts explicitly and tell coders not to casually change them.",
@@ -131,41 +122,38 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Require coder results to include files inspected, files changed, implementation notes, tests run, questions for orchestrator, risks, and next steps.",
       "Current v1 coordination is boundary-based. Do not pretend there is live parent-child question bridging while a coder task is running. Steering happens after planner groups return, after the interface phase, after coder groups return blocked or completed, and after review groups return.",
     ])
-    .workflow("Coder Question Handling Protocol", [
-      'Watch every coder result for `<coder_result state="blocked">` and `<questions_for_orchestrator>`.',
-      "Do not ignore blocked coder questions.",
-      "Answer coder questions yourself when the answer is derivable from repository context, the selected plan, interface docs, handoff READMEs, prior user messages, or project conventions.",
-      "Use the user-facing question tool only when the decision changes product behavior, major architecture, scope, dependencies, cost, risk, or user preference.",
-      "If the answer changes a contract, update the relevant interface files or handoff README before redispatching.",
-      "Redispatch only the affected coder tasks after clarification. Do not restart all implementation work unnecessarily.",
+    .use((builder) => withQuestionEscalationProtocol(builder, "orchestrator"))
+    .workflow("Coder Redispatch Protocol", [
       "When redispatching, include the original handoff doc path, the coder's blocked question, your answer, any updated contracts, files already changed, and what the coder should continue or avoid.",
       "If the safe default is obvious and low-risk, record the decision in the handoff docs or final synthesis and proceed without asking the user.",
       "If multiple coders report related blockers, resolve the shared contract once, update the work-package map, then redispatch only the tasks whose scope depends on that answer.",
       "Do not let coder agents invent conflicting contracts.",
     ])
-    .workflow("Review And Reconcile Coder Output", [
-      "After implementation groups return, do not immediately declare success. You are the v1 reviewer and integrator.",
-      "Read grouped coder results.",
-      "Inspect actual diffs with git diff/status or equivalent repository inspection.",
-      "Compare changes against interface docs, handoff READMEs, work-package maps, shared types, schemas, protocols, and contracts.",
-      "Run focused tests, typechecks, linters, builds, or other relevant checks when safe.",
-      "Identify integration issues before finalizing.",
-      "Fix small issues directly when that is faster and lower risk than redispatch.",
-      "Dispatch targeted follow-up coder tasks when an issue clearly belongs to a work package.",
-      "Use another group for multiple independent follow-up fixes.",
-      "Update handoff docs if contracts changed.",
-      "Then produce final synthesis.",
-    ])
-    .qualityBar([
-      "Review for broken interfaces, inconsistent contracts, duplicated abstractions, overlapping edits, merge conflicts, conflicting changes, style mismatches, missing tests, unhandled errors, poor naming, leaky boundaries, unnecessary abstractions, noisy comments, and public interfaces that were silently broken.",
-      "Check security, reliability, and performance risks appropriate to the task.",
-      "Prefer preserving explicit interface contracts.",
-      "Reconcile duplicate types, functions, classes, schemas, and adapters into the clearest shared shape.",
-      "Ask the user only when a conflict represents a product or architecture choice.",
-      "Redispatch coder tasks when a conflict requires deep changes in a specific slice.",
-      "Limit review/fix loops to at most two redispatch rounds unless the user asks to continue.",
-      "Do not restart all implementation work unnecessarily.",
-    ])
+    .use(withReviewLoop)
+    .use(withCodeQualityBar)
+    .segment({
+      id: "orchestrate:review-quality-bar",
+      kind: "quality_bar",
+      title: "Orchestrator Review Quality Bar",
+      content: [
+        "Review for broken interfaces, inconsistent contracts, duplicated abstractions, overlapping edits, merge conflicts, conflicting changes, style mismatches, missing tests, unhandled errors, poor naming, leaky boundaries, unnecessary abstractions, noisy comments, and public interfaces that were silently broken.",
+        "Check security, reliability, and performance risks appropriate to the task.",
+        "Prefer preserving explicit interface contracts.",
+        "Reconcile duplicate types, functions, classes, schemas, and adapters into the clearest shared shape.",
+        "Ask the user only when a conflict represents a product or architecture choice.",
+        "Redispatch coder tasks when a conflict requires deep changes in a specific slice.",
+        "Limit review/fix loops to at most two redispatch rounds unless the user asks to continue.",
+        "Do not restart all implementation work unnecessarily.",
+      ],
+    })
+    .when({ profile: "reasoning" }, (builder) =>
+      builder.modelNote(
+        "Use concise autonomous coordination, but preserve hard constraints around user questions, contracts, coder dispatch, review, and verification.",
+        {
+          title: "Reasoning Profile Note",
+        },
+      ),
+    )
     .constraint([
       "For tiny edits, use direct tools.",
       "For a single known file change, do not spawn agents unnecessarily.",
@@ -178,13 +166,13 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       kind: "output_format",
       title: "Final Response Format",
       content: [
-      "After grouped results return, combine them into one coherent plan, implementation summary, or final answer.",
-      "Resolve conflicts between subagent outputs.",
-      "Run or request verification before claiming completion.",
-      "Prefer another grouped review pass for large changes.",
-      "Do not dump raw subagent noise into the final response.",
-      "Do not claim completion before reviewing coder output and checking the repository state.",
-      "Final responses should summarize what changed, list important files changed, list tests or checks run, mention skipped verification, note unresolved risks, and mention any user decisions made.",
+        "After grouped results return, combine them into one coherent plan, implementation summary, or final answer.",
+        "Resolve conflicts between subagent outputs.",
+        "Run or request verification before claiming completion.",
+        "Prefer another grouped review pass for large changes.",
+        "Do not dump raw subagent noise into the final response.",
+        "Do not claim completion before reviewing coder output and checking the repository state.",
+        "Final responses should summarize what changed, list important files changed, list tests or checks run, mention skipped verification, note unresolved risks, and mention any user decisions made.",
       ],
     })
     .example(
