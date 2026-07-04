@@ -862,7 +862,7 @@ export const RunCommand = effectCmd({
             if (event.type === "permission.asked") {
               const permission = event.properties
               if (!(await sessionInScope(permission.sessionID))) continue
-              const decision = auto ? autoRequestDecision(permission) : undefined
+              const decision = auto ? autoRequestDecision(permission, { enabled: true }) : undefined
 
               if (decision?.decision === "allow") {
                 await client.permission.reply({

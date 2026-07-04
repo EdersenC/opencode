@@ -6,35 +6,36 @@ Usage notes:
 1. One group tool call represents one group.
 2. To run multiple groups concurrently, call group multiple times in the same assistant message.
 3. Each group waits for all of its inner calls before returning.
-4. Use priority only to break ties among groups that complete at essentially the same time.
-5. Do not use group for unrelated work that should return independently unless you are intentionally creating separate grouped results.
-6. v1 supports nested task calls only.
-7. Inner task calls run concurrently. Do not duplicate that work yourself.
-8. Inner background tasks are not supported because group waits for foreground completion.
-9. fail_fast is accepted for forward compatibility, but v1 returns all settled nested results because stopping sibling task calls early without changing task/session cleanup could lose result and cancellation accounting.
-10. If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. The caller should answer or ask the user, then redispatch only the affected task.
-11. For nested coder tasks, prefer input.handoff_files for handoff READMEs, interface contracts, work-package maps, and context docs. Keep input.prompt focused on the task goal, scope, constraints, and expected return format instead of pasting large handoff documents.
-12. Use group to fully leverage parallel work. If several coder tasks can start from the same contracts or handoff files, put them in the same group call instead of issuing one task, waiting, and then issuing the next.
-13. Use dependency-layer groups. Run a foundation or contract group only when needed, then run every ready implementation slice in one follow-up group, then run review and verification in another group.
-14. Serial task dispatch is only appropriate when a later task genuinely needs concrete output from an earlier task and written contracts are not enough to proceed safely.
-15. Before creating a group, identify every ready sibling task. A group can contain many nested task calls, and all of those inner task calls start concurrently.
-16. For coder groups, use the configured coder subagents/models to do the coding work. The caller should coordinate contracts, boundaries, review, and verification rather than manually implementing medium or large slices.
-17. If engine, CLI, tests, docs, adapters, or UI can all code against the same handoff files, dispatch them together in one implementation group.
-18. Keep nested coder prompts concise. Put large handoff documents in input.handoff_files and tell the coder which files to own, avoid, verify, and report on.
-19. A group is not limited to one or two task calls. If four or five ready coder slices have non-overlapping ownership, put all four or five nested task calls in the same group.
-20. Do not call a single-coder group "parallel" when other ready coder slices are waiting. Parallel work means multiple nested task calls in the same group call or multiple independent group calls in the same assistant message.
-21. After a foundation task returns, do one readiness pass and launch every now-ready dependent coder slice together. Do not serially drip-feed engine, CLI, tests, and docs if the contracts let them proceed.
-22. Treat calls[] as the batch. Fill it with every ready sibling task that can safely run from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
-23. If you say a phase is parallel, the group call should normally contain multiple nested task calls. A single nested task is not parallel unless there are also independent group calls in the same assistant message.
-24. Do not run engine first, then CLI, then tests when CLI and tests can code against the same handoff files. Put engine, CLI, tests, docs, adapters, or UI together when ownership boundaries are clear.
-25. Use descriptive group.name and calls[].name values because users see those labels while work is running.
-26. Keep the user experience smooth: point coder tasks at handoff_files, keep prompts short, and avoid making the user wait through avoidable serial batches.
-27. Group summaries distinguish completed, failed, aborted, and blocked calls. Treat aborted as cancelled work, not as a normal task failure.
-28. Batch before narration. Decide the full ready sibling set first, then emit the group call. Do not narrate a "parallel phase" and then send only one coder when other ready slices exist.
-29. If only one nested coder call is ready, consider using task directly unless you need group metadata, grouped blocked-result handling, or a deliberately grouped single result.
-30. After any foundation or shared-contract task completes, reclassify deferred slices once and launch every now-ready coder slice in the next group instead of drip-feeding follow-up work.
-31. Post-foundation anti-pattern: foundation completes, then engine runs alone, then CLI runs alone, then tests run alone. Correct pattern: once contracts and handoff files exist, put engine, CLI, tests, docs, adapters, or UI in one group when their ownership boundaries are clear.
-32. If you defer a coder slice after foundation, name the concrete missing artifact that prevents it from starting from the current contracts. If there is no such artifact, include it in the current calls[] batch.
+4. For one logical implementation bucket, put every ready related coder task in the same group calls array so they start in one go.
+5. Use priority only to break ties among groups that complete at essentially the same time.
+6. Do not use group for unrelated work that should return independently unless you are intentionally creating separate grouped results.
+7. v1 supports nested task calls only.
+8. Inner task calls run concurrently. Do not duplicate that work yourself.
+9. Inner background tasks are not supported because group waits for foreground completion.
+10. fail_fast is accepted for forward compatibility, but v1 returns all settled nested results because stopping sibling task calls early without changing task/session cleanup could lose result and cancellation accounting.
+11. If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. The caller should answer or ask the user, then redispatch only the affected task.
+12. For nested coder tasks, prefer input.handoff_files for handoff READMEs, interface contracts, work-package maps, and context docs. Keep input.prompt focused on the task goal, scope, constraints, and expected return format instead of pasting large handoff documents.
+13. Use group to fully leverage parallel work. If several coder tasks can start from the same contracts or handoff files, put them in the same group call instead of issuing one task, waiting, and then issuing the next.
+14. Use dependency-layer groups. Run a foundation or contract group only when needed, then run every ready implementation slice in one follow-up group, then run review and verification in another group.
+15. Serial task dispatch is only appropriate when a later task genuinely needs concrete output from an earlier task and written contracts are not enough to proceed safely.
+16. Before creating a group, identify every ready sibling task. A group can contain many nested task calls, and all of those inner task calls start concurrently.
+17. For coder groups, use the configured coder subagents/models to do the coding work. The caller should coordinate contracts, boundaries, review, and verification rather than manually implementing medium or large slices.
+18. If engine, CLI, tests, docs, adapters, or UI can all code against the same handoff files, dispatch them together in one implementation group.
+19. Keep nested coder prompts concise. Put large handoff documents in input.handoff_files and tell the coder which files to own, avoid, verify, and report on.
+20. A group is not limited to one or two task calls. If four or five ready coder slices have non-overlapping ownership, put all four or five nested task calls in the same group.
+21. Do not call a single-coder group "parallel" when other ready coder slices are waiting. Parallel work means multiple nested task calls in the same group call or multiple independent group calls in the same assistant message.
+22. After a foundation task returns, do one readiness pass and launch every now-ready dependent coder slice together. Do not serially drip-feed engine, CLI, tests, and docs if the contracts let them proceed.
+23. Treat calls[] as the batch. Fill it with every ready sibling task that can safely run from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
+24. If you say a phase is parallel, the group call should normally contain multiple nested task calls. A single nested task is not parallel unless there are also independent group calls in the same assistant message.
+25. Do not run engine first, then CLI, then tests when CLI and tests can code against the same handoff files. Put engine, CLI, tests, docs, adapters, or UI together when ownership boundaries are clear.
+26. Use descriptive group.name and calls[].name values because users see those labels while work is running.
+27. Keep the user experience smooth: point coder tasks at handoff_files, keep prompts short, and avoid making the user wait through avoidable serial batches.
+28. Group summaries distinguish completed, failed, aborted, and blocked calls. Treat aborted as cancelled work, not as a normal task failure.
+29. Batch before narration. Decide the full ready sibling set first, then emit the group call. Do not narrate a "parallel phase" and then send only one coder when other ready slices exist.
+30. If only one nested coder call is ready, consider using task directly unless you need group metadata, grouped blocked-result handling, or a deliberately grouped single result.
+31. After any foundation or shared-contract task completes, reclassify deferred slices once and launch every now-ready coder slice in the next group instead of drip-feeding follow-up work.
+32. Post-foundation anti-pattern: foundation completes, then engine runs alone, then CLI runs alone, then tests run alone. Correct pattern: once contracts and handoff files exist, put engine, CLI, tests, docs, adapters, or UI in one group when their ownership boundaries are clear.
+33. If you defer a coder slice after foundation, name the concrete missing artifact that prevents it from starting from the current contracts. If there is no such artifact, include it in the current calls[] batch.
 
 Example input:
 

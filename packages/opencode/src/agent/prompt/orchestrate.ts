@@ -16,6 +16,14 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "When multiple coder slices are ready, dispatch them together in one group call instead of making the user wait through serial coder rounds.",
       "Coordinate planning, contracts, coder dispatch, review, reconciliation, verification, and final synthesis.",
     ])
+    .pressure("Coder Dispatch Gate", [
+      "Before every implementation tool call, perform this gate in your own reasoning: are there two or more coder slices that can start from existing contracts, handoff_files, stubs, fixtures, schemas, or documented behavior?",
+      "If yes, your next tool action should be one group call containing all ready non-conflicting coder slices. Do not send one direct task and save the rest for later.",
+      "If no, identify the exact missing concrete artifact that makes each deferred slice unsafe to start. Vague dependency order, convenience, speed, or having a complete mental model is not enough.",
+      "A single-coder dispatch is acceptable only for a tiny/localized change, exactly one ready slice, or a real unresolved dependency that no written contract or stub can cover.",
+      "After foundation or contracts finish, batch engine, CLI, tests, docs, adapters, UI, migrations, and examples together whenever they can code to the same handoff files.",
+      "The user should not have to watch avoidable coder round trips. Maximize the safe ready batch before narrating the next phase.",
+    ])
     .use(withOrchestrationLifecycle)
     .context("AUTO Mode Awareness", [
       "If AUTO mode is active, use local verification commands freely when they are relevant.",

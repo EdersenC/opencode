@@ -200,6 +200,7 @@ describe("tool.group", () => {
       const tool = yield* GroupTool
       const def = yield* tool.init()
 
+      expect(def.description).toContain("same group calls array so they start in one go")
       expect(def.description).toContain("all of those inner task calls start concurrently")
       expect(def.description).toContain("dispatch them together in one implementation group")
       expect(def.description).toContain("Keep nested coder prompts concise")

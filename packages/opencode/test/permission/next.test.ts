@@ -636,6 +636,48 @@ it.instance(
 )
 
 it.instance(
+  "ask - auto mode resolves safe project-local non-shell requests",
+  () =>
+    Effect.gen(function* () {
+      const result = yield* ask({
+        sessionID: SessionID.make("session_test"),
+        permission: "edit",
+        patterns: ["src/index.ts"],
+        metadata: {
+          permissionMode: "auto",
+        },
+        always: ["src/index.ts"],
+        ruleset: [{ permission: "edit", pattern: "*", action: "ask" }],
+      })
+      expect(result).toBeUndefined()
+      expect(yield* list()).toHaveLength(0)
+    }),
+  { git: true },
+)
+
+it.instance(
+  "ask - auto mode does not resolve path-escaping non-shell requests",
+  () =>
+    Effect.gen(function* () {
+      const fiber = yield* ask({
+        sessionID: SessionID.make("session_test"),
+        permission: "edit",
+        patterns: ["../secret.txt"],
+        metadata: {
+          permissionMode: "auto",
+        },
+        always: ["../secret.txt"],
+        ruleset: [{ permission: "edit", pattern: "*", action: "ask" }],
+      }).pipe(Effect.forkScoped)
+
+      expect(yield* waitForPending(1)).toHaveLength(1)
+      yield* rejectAll()
+      yield* Fiber.await(fiber)
+    }),
+  { git: true },
+)
+
+it.instance(
   "ask - auto mode does not resolve unsafe shell requests",
   () =>
     Effect.gen(function* () {

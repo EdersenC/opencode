@@ -24,8 +24,19 @@ export type ShellClassifierResult = {
 
 type PermissionLike = {
   permission: string
+  patterns?: readonly string[]
   metadata?: Record<string, unknown>
 }
+
+type AutoDecisionResult =
+  | ShellClassifierResult
+  | {
+      kind: "project-local-permission"
+      safe: boolean
+      decision: ShellDecision
+      reason: string
+      matchedRule?: string
+    }
 
 const REMOTE_PIPE =
   /\b(curl|wget|iwr|Invoke-WebRequest)\b[\s\S]*\|\s*(sh|bash|zsh|fish|pwsh|powershell|iex|Invoke-Expression)\b/i
@@ -60,6 +71,19 @@ const FIND_DESTRUCTIVE = /(^|[;&|]\s*)find\s+[\s\S]*(\s-delete\b|-exec\s+rm\s+)/
 const SYSTEM_PATH =
   /(^|\s)(\/etc|\/usr|\/bin|\/sbin|\/var|\/opt|\/root|\/tmp|\/Library|~|\$HOME\b|\$\{HOME\}|[A-Za-z]:[\\/](Windows|Program Files))\b/i
 const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/
+const AUTO_LOCAL_PERMISSIONS = new Set([
+  "glob",
+  "grep",
+  "group",
+  "list",
+  "lsp",
+  "read",
+  "skill",
+  "task",
+  "todowrite",
+])
+const AUTO_LOCAL_PATH_PERMISSIONS = new Set(["edit", "read"])
+const AUTO_LOCAL_MUTATION_PERMISSIONS = new Set(["edit"])
 
 const LOCAL_COMMANDS = new Set([
   "[",
@@ -186,41 +210,43 @@ export function shellApproval(input: Omit<ShellClassifierInput, "permissionMode"
 
 export function autoDecision(input: PermissionLike) {
   if (normalizeMode(input.metadata?.permissionMode) !== "auto") return
-  return autoRequestDecision(input)
+  return autoRequestDecision(input, { enabled: true })
 }
 
-export function autoRequestDecision(input: PermissionLike) {
+export function autoRequestDecision(input: PermissionLike, options?: { enabled?: boolean }) {
   const approval = input.metadata?.autoApprove
   if (
-    input.permission !== "bash" ||
-    typeof approval !== "object" ||
-    approval === null ||
-    !("kind" in approval) ||
-    approval.kind !== "project-local-shell"
+    input.permission === "bash" &&
+    typeof approval === "object" &&
+    approval !== null &&
+    "kind" in approval &&
+    approval.kind === "project-local-shell"
   ) {
-    return
+    if ("decision" in approval) {
+      const decision = approval.decision
+      if (decision === "allow" || decision === "ask" || decision === "deny") return approval as ShellClassifierResult
+    }
+    if ("safe" in approval && approval.safe === true) {
+      const reason =
+        "reason" in approval && typeof approval.reason === "string" ? approval.reason : "AUTO: project-local command"
+      return {
+        ...(approval as Record<string, unknown>),
+        decision: "allow",
+        reason,
+      } as ShellClassifierResult
+    }
   }
-  if ("decision" in approval) {
-    const decision = approval.decision
-    if (decision === "allow" || decision === "ask" || decision === "deny") return approval as ShellClassifierResult
-  }
-  if ("safe" in approval && approval.safe === true) {
-    const reason =
-      "reason" in approval && typeof approval.reason === "string" ? approval.reason : "AUTO: project-local command"
-    return {
-      ...(approval as Record<string, unknown>),
-      decision: "allow",
-      reason,
-    } as ShellClassifierResult
-  }
+
+  if (options?.enabled !== true && normalizeMode(input.metadata?.permissionMode) !== "auto") return
+  return localPermissionDecision(input)
 }
 
-export function canAutoApproveRequest(input: PermissionLike) {
-  return autoRequestDecision(input)?.decision === "allow"
+export function canAutoApproveRequest(input: PermissionLike, options?: { enabled?: boolean }) {
+  return autoRequestDecision(input, options)?.decision === "allow"
 }
 
-export function canAutoDenyRequest(input: PermissionLike) {
-  return autoRequestDecision(input)?.decision === "deny"
+export function canAutoDenyRequest(input: PermissionLike, options?: { enabled?: boolean }) {
+  return autoRequestDecision(input, options)?.decision === "deny"
 }
 
 function denyRule(command: string) {
@@ -443,6 +469,58 @@ function ask(reason: string, matchedRule: string) {
     reason,
     matchedRule,
   } satisfies ShellClassifierResult
+}
+
+function localPermissionDecision(input: PermissionLike): AutoDecisionResult | undefined {
+  if (input.permission === "external_directory") {
+    return permissionAsk("external directory access must remain explicit", "external-directory")
+  }
+
+  if (AUTO_LOCAL_PATH_PERMISSIONS.has(input.permission) && !safeLocalPatterns(input.patterns)) {
+    return permissionAsk("permission references a path outside the project", "path-containment")
+  }
+
+  if (AUTO_LOCAL_MUTATION_PERMISSIONS.has(input.permission)) {
+    return permissionAllow("AUTO: project-local mutation permission", "project-local-mutation")
+  }
+
+  if (AUTO_LOCAL_PERMISSIONS.has(input.permission)) {
+    return permissionAllow("AUTO: project-local permission", "project-local-permission")
+  }
+}
+
+function safeLocalPatterns(patterns: readonly string[] | undefined) {
+  if (!patterns?.length) return false
+  return patterns.every((pattern) => {
+    if (!pattern || pattern === "*") return false
+    const normalized = pattern.replaceAll("\\", "/")
+    if (normalized === "." || normalized.startsWith("./")) return true
+    if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) return false
+    if (normalized.startsWith("/") || normalized === "~" || normalized.startsWith("~/")) return false
+    if (normalized.startsWith("mcp:") || normalized.includes("://")) return false
+    if (WINDOWS_ABSOLUTE.test(pattern)) return false
+    return true
+  })
+}
+
+function permissionAllow(reason: string, matchedRule: string) {
+  return {
+    kind: "project-local-permission",
+    safe: true,
+    decision: "allow",
+    reason,
+    matchedRule,
+  } satisfies AutoDecisionResult
+}
+
+function permissionAsk(reason: string, matchedRule: string) {
+  return {
+    kind: "project-local-permission",
+    safe: false,
+    decision: "ask",
+    reason,
+    matchedRule,
+  } satisfies AutoDecisionResult
 }
 
 function deny(reason: string, matchedRule: string) {

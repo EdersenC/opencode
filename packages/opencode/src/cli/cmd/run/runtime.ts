@@ -505,7 +505,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
             return false
           }
 
-          if (canAutoApproveRequest(request)) {
+          if (canAutoApproveRequest(request, { enabled: true })) {
             void ctx.sdk.permission
               .reply({
                 requestID: request.id,
@@ -515,7 +515,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
             return true
           }
 
-          if (canAutoDenyRequest(request)) {
+          if (canAutoDenyRequest(request, { enabled: true })) {
             void ctx.sdk.permission
               .reply({
                 requestID: request.id,

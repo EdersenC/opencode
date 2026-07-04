@@ -259,4 +259,94 @@ describe("auto permission request decisions", () => {
       matchedRule: "rm-root-home",
     })
   })
+
+  test("auto-approves safe project-local non-bash permissions", () => {
+    expect(
+      autoRequestDecision({
+        permission: "read",
+        patterns: ["src/index.ts"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "allow",
+      matchedRule: "project-local-permission",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "edit",
+        patterns: ["src/index.ts"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "allow",
+      matchedRule: "project-local-mutation",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "group",
+        patterns: ["implementation-slices"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "allow",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "task",
+        patterns: ["coder"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "allow",
+    })
+  })
+
+  test("keeps external and path-escaping non-bash permissions manual", () => {
+    expect(
+      autoRequestDecision({
+        permission: "external_directory",
+        patterns: ["/tmp/*"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "ask",
+      matchedRule: "external-directory",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "read",
+        patterns: ["../secret.txt"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "ask",
+      matchedRule: "path-containment",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "edit",
+        patterns: ["C:\\Temp\\secret.txt"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "ask",
+      matchedRule: "path-containment",
+    })
+
+    expect(
+      autoRequestDecision({
+        permission: "read",
+        patterns: ["mcp:server:resource"],
+        metadata: { permissionMode: "auto" },
+      }),
+    ).toMatchObject({
+      decision: "ask",
+      matchedRule: "path-containment",
+    })
+  })
 })

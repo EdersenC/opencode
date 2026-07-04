@@ -51,22 +51,47 @@ function search<T>(items: T[], target: string, key: (item: T) => string) {
   return { found: false, index: left }
 }
 
-function autoPermissionDecision(request: PermissionRequest) {
+export function autoPermissionDecision(request: PermissionRequest) {
   const approval = request.metadata?.autoApprove
   if (
-    request.permission !== "bash" ||
-    typeof approval !== "object" ||
-    approval === null ||
-    !("kind" in approval) ||
-    approval.kind !== "project-local-shell"
+    request.permission === "bash" &&
+    typeof approval === "object" &&
+    approval !== null &&
+    "kind" in approval &&
+    approval.kind === "project-local-shell"
   ) {
-    return
+    if ("decision" in approval) {
+      const decision = approval.decision
+      if (decision === "allow" || decision === "ask" || decision === "deny") return decision
+    }
+    if ("safe" in approval && approval.safe === true) return "allow"
   }
-  if ("decision" in approval) {
-    const decision = approval.decision
-    if (decision === "allow" || decision === "ask" || decision === "deny") return decision
+
+  if (request.permission === "external_directory") return "ask"
+  if ((request.permission === "edit" || request.permission === "read") && !safeLocalPatterns(request.patterns)) {
+    return "ask"
   }
-  if ("safe" in approval && approval.safe === true) return "allow"
+  if (
+    ["edit", "glob", "grep", "group", "list", "lsp", "read", "skill", "task", "todowrite"].includes(
+      request.permission,
+    )
+  ) {
+    return "allow"
+  }
+}
+
+function safeLocalPatterns(patterns: readonly string[] | undefined) {
+  if (!patterns?.length) return false
+  return patterns.every((pattern) => {
+    if (!pattern || pattern === "*") return false
+    const normalized = pattern.replaceAll("\\", "/")
+    if (normalized === "." || normalized.startsWith("./")) return true
+    if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) return false
+    if (normalized.startsWith("/") || normalized === "~" || normalized.startsWith("~/")) return false
+    if (normalized.startsWith("mcp:") || normalized.includes("://")) return false
+    if (/^[A-Za-z]:[\\/]/.test(pattern)) return false
+    return true
+  })
 }
 
 export const {
