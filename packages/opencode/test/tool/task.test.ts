@@ -186,7 +186,7 @@ describe("tool.task", () => {
         expect(general).toBeGreaterThan(explore)
         expect(planner).toBeGreaterThan(general)
         expect(zebra).toBeGreaterThan(planner)
-        expect(first).toContain("related coder slices that belong to one implementation bucket")
+        expect(first).toContain("related coder slices that share one implementation bucket")
         expect(first).toContain("use group with multiple nested task calls")
         expect(first).toContain("For a post-foundation implementation layer")
         expect(first).toContain("Do not announce a parallel coder phase")

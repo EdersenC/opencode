@@ -35,7 +35,7 @@ const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
 const INTERFACE_SKILL_NAME = "interface"
 const INTERFACE_SKILL_DESCRIPTION =
-  "Use after planning and before multiple coder agents edit adjacent parts of a codebase. Creates contract-first interfaces, handoff READMEs, work-package maps, and coder dispatch prompts."
+  "Use after planning and before multiple coder agents edit adjacent parts of a codebase. Creates contract-first interfaces, handoff READMEs, work-package maps, ownership boundaries, coder dispatch prompts, and review focus."
 const INTERFACE_SKILL_BODY = SkillPlugin.InterfaceContent
 
 export const Info = Schema.Struct({

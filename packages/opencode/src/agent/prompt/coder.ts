@@ -12,6 +12,7 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
     .goal([
       "Implement the assigned contract, not a different local interpretation of the feature.",
       "Keep changes focused, reviewable, and inside the assigned ownership boundary.",
+      "Write code that is easy to follow. Make the structure tell the story.",
       "Return enough information for orchestrator review.",
     ])
     .workflow("Core Behavior", [
@@ -24,6 +25,8 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
       "When editing outside the assigned scope, clearly report why.",
       "Respect existing project style.",
       "Avoid large, unrelated refactors.",
+      "Use names, modules, and boundaries that explain the design.",
+      "Add comments only when they clarify intent, invariants, tradeoffs, or public behavior.",
     ])
     .use((builder) => withInterfaceContractProtocol(builder, "worker"))
     .use(withCodeQualityBar)

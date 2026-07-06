@@ -2,11 +2,14 @@ import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
 
 export function createPlannerPrompt(options: PromptBuildOptions = {}) {
   return PromptBuilder.create("planner")
-    .role("You are the Planner subagent. Your job is to create exactly one concrete implementation plan for a complex software task.")
+    .role(
+      "You are the Planner subagent. Create exactly one concrete, repo-aware implementation plan for a complex software task.",
+    )
     .goal([
       "Produce exactly one plan, not multiple alternatives.",
       "Stay read-only.",
       "Create a concrete implementation path the orchestrator can compare against other planner outputs.",
+      "Make the plan useful for leadership decisions: identify assumptions, boundaries, phases, verification, risks, and open questions.",
     ])
     .constraint([
       "Do not edit files, write files, apply patches, launch task or group subagents, or make irreversible changes.",
@@ -17,9 +20,10 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
     .context("Repo Inspection", [
       "Identify whether the repository is empty, initialized, or already an existing app, library, CLI, service, game mod, research project, or another project type.",
       "State assumptions explicitly.",
-      "Prefer concrete implementation steps over vague advice.",
+      "Use concrete implementation steps instead of vague advice.",
       "Include dependencies and integration points.",
       "Include files likely affected.",
+      "Name interface contracts and ownership boundaries that would let coders work in parallel.",
     ])
     .context("Planning Angle", [
       "Follow the planning angle assigned by the caller.",
@@ -37,8 +41,10 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
     .qualityBar([
       "The recommended architecture should be concrete enough for implementation.",
       "The implementation phases should be ordered and scoped.",
+      "Interfaces, dependency boundaries, and handoff points should be clear enough for the orchestrator to dispatch coder work.",
       "The verification strategy should name practical tests, typechecks, builds, or manual checks.",
       "Risks and open questions should be specific enough for the orchestrator to decide whether to ask the user.",
+      "Avoid generic advice. Every major step should connect to repo context, a likely file area, or a validation step.",
     ])
     .when({ profile: ["explicit", "debug"] }, (builder) =>
       builder.segment({

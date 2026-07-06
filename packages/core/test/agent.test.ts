@@ -132,6 +132,14 @@ describe("AgentV2", () => {
 
       const orchestrate = yield* agent.get(AgentV2.ID.make("orchestrate"))
       expect(orchestrate?.mode).toBe("primary")
+      expect(orchestrate?.system).toContain("Lead the work")
+      expect(orchestrate?.system).toContain("root coordinator")
+      expect(orchestrate?.system).toContain("Act with leadership")
+      expect(orchestrate?.system).toContain("shared objectives")
+      expect(orchestrate?.system).toContain("Cluster related task calls")
+      expect(orchestrate?.system).toContain("fan-out/fan-in execution")
+      expect(orchestrate?.system).toContain("completion barrier")
+      expect(orchestrate?.system).toContain("parallel lanes")
       expect(orchestrate?.system).toContain("interface skill")
       expect(orchestrate?.system).toContain("Ask questions when they are likely to materially improve the work")
       expect(orchestrate?.system).toContain("default to asking at least one targeted question")
@@ -160,6 +168,9 @@ describe("AgentV2", () => {
 
       const coder = yield* agent.get(AgentV2.ID.make("coder"))
       expect(coder?.mode).toBe("subagent")
+      expect(coder?.system).toContain("Write code that is easy to follow")
+      expect(coder?.system).toContain("Make the structure tell the story")
+      expect(coder?.system).toContain("boundaries that explain the design")
       expect(coder?.system).toContain("Treat interface contracts as the source of truth")
       expect(coder?.system).toContain("If sibling implementation code is not present yet")
       expect(coder?.system).toContain("implement against the contract")
@@ -174,6 +185,8 @@ describe("AgentV2", () => {
 
       const planner = yield* agent.get(AgentV2.ID.make("planner"))
       expect(planner?.mode).toBe("subagent")
+      expect(planner?.system).toContain("concrete, repo-aware implementation plan")
+      expect(planner?.system).toContain("ownership boundaries")
       expect(planner?.system).toContain("Include recommended coder work packages")
       expect(planner?.system).toContain("recommend sequential coder phases")
     }),

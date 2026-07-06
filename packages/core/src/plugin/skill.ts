@@ -34,7 +34,7 @@ export const Plugin = define({
           skill: SkillV2.Info.make({
             name: "interface",
             description:
-              "Use after planning and before multiple coder agents edit adjacent parts of a codebase. Creates contract-first interfaces, handoff READMEs, work-package maps, and coder dispatch prompts.",
+              "Use after planning and before multiple coder agents edit adjacent parts of a codebase. Creates contract-first interfaces, handoff READMEs, work-package maps, ownership boundaries, coder dispatch prompts, and review focus.",
             location: AbsolutePath.make("/builtin/interface.md"),
             content: InterfaceContent,
           }),

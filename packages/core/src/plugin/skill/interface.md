@@ -3,7 +3,7 @@
 Use this skill when a large task needs multiple implementation agents.
 
 Purpose:
-Create contract-first interfaces and handoff documents before dispatching coder agents.
+Create contract-first interfaces and handoff documents before dispatching coder agents. This skill turns a broad plan into clear ownership boundaries, shared contracts, parallel lanes, sequential dependencies, and review focus.
 
 ## When To Use
 
@@ -28,10 +28,11 @@ Create contract-first interfaces and handoff documents before dispatching coder 
 3. Identify implementation seams: modules, directories, packages, services, components, adapters, layers, interfaces, schemas, DTOs, messages, data shapes, APIs, protocols, traits, abstract classes, boundary functions, and dependency direction.
 4. Create or update interface contracts.
 5. Create handoff README files.
-6. Create a work-package map.
+6. Create a work-package map that clusters coder tasks by shared objective and ownership boundary.
 7. Decide which coder tasks can run in parallel and which must run sequentially.
 8. Produce coder dispatch prompts.
 9. Mark the ready-now coder batch separately from tasks that are blocked by unresolved dependencies.
+10. Name the review focus for each work package so the orchestrator can reconcile results after fan-in.
 
 ## Interface Contracts
 
@@ -72,6 +73,7 @@ Each coder should receive a clear ownership slice:
 - Owned files and directories.
 - Files and directories to avoid.
 - Shared contract files that should not be casually changed.
+- Common goal and shared objective for the grouped work.
 - Upstream and downstream dependencies.
 - Public contracts the slice must implement or respect.
 - Correctness criteria for the slice.
@@ -86,6 +88,8 @@ Avoid overlapping edit scopes. If overlap is unavoidable, make one task own the 
 Run coder tasks in parallel only when their owned files and contracts are clear, their dependencies already exist, and they can complete without editing the same files.
 
 If a task can proceed from written contracts, interface files, fixtures, stubs, or handoff docs, treat it as ready for the next parallel group even if sibling implementation code is not finished yet.
+
+Use fan-out/fan-in deliberately: fan out ready coder tasks in one group, let the cohort work against the same contracts, then fan in results for review, reconciliation, and verification.
 
 Run coder tasks sequentially when:
 
@@ -104,7 +108,7 @@ Avoid drip-feeding coders. After the foundation or contract layer exists, launch
 Each coder prompt should include:
 
 - Assigned scope.
-- Interface or handoff README path.
+- Interface or handoff README path, also passed through the task `handoff_files` array.
 - Files and directories to own.
 - Files and directories to avoid.
 - Public contracts to implement or respect.
@@ -113,6 +117,8 @@ Each coder prompt should include:
 - Question escalation protocol.
 
 Tell coders to read the handoff README first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to the orchestrator instead of silently inventing incompatible behavior.
+
+Keep coder prompts short. Put detailed contracts, handoff READMEs, and work-package maps in `handoff_files` so the coder reads the source artifact instead of a huge pasted prompt.
 
 ## Required Handoff README Template
 

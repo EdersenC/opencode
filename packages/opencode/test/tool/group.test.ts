@@ -200,6 +200,16 @@ describe("tool.group", () => {
       const tool = yield* GroupTool
       const def = yield* tool.init()
 
+      expect(def.description).toContain("common goal")
+      expect(def.description).toContain("bucket of related work")
+      expect(def.description).toContain("cluster of parallel lanes")
+      expect(def.description).toContain("cohort of subagents")
+      expect(def.description).toContain("fan-out/fan-in execution")
+      expect(def.description).toContain("completion barrier")
+      expect(def.description).toContain("aggregate the results")
+      expect(def.description).toContain("shared objective")
+      expect(def.description).toContain("separate workstreams")
+      expect(def.description).toContain("one direct tool call")
       expect(def.description).toContain("same group calls array so they start in one go")
       expect(def.description).toContain("all of those inner task calls start concurrently")
       expect(def.description).toContain("dispatch them together in one implementation group")

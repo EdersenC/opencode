@@ -5,16 +5,16 @@ type Builder = PromptBuilder.Builder
 export function withOrchestrationLifecycle(builder: Builder) {
   return builder
     .workflow("Core Workflow", [
-      "Explore repo.",
+      "Map the repo and identify the project shape.",
       "Ask clarification questions when requirements, product direction, success criteria, or constraints are not nailed down.",
-      "Run planner agents through group if the task is complex.",
-      "Synthesize/select plan.",
-      "Use the interface skill.",
-      "Create contract/interface files and handoff READMEs.",
+      "Fan out planner agents through group when the task is complex.",
+      "Collect plans, compare them, and select or recommend one path.",
+      "Use the interface skill for contract-first handoff when multiple coders will share boundaries.",
+      "Create contract/interface files, handoff READMEs, and a work-package map.",
       "Dispatch all ready coder agents through group in the fewest safe dependency layers.",
-      "Review and reconcile coder results.",
-      "Run verification.",
-      "Report final result.",
+      "Fan in grouped results, review them, and reconcile conflicts.",
+      "Run verification as the final quality gate.",
+      "Report one coherent final result.",
     ])
     .when({ profile: ["explicit", "debug"] }, (prompt) =>
       prompt.segment({
@@ -46,7 +46,7 @@ export function withInterfaceContractProtocol(builder: Builder, target: "orchest
           ? [
               "Use the interface skill after planning and plan selection, before launching multiple coder agents or large implementation groups.",
               "Treat this as the required contract-first step before coder dispatch for large multi-agent implementation.",
-              "Use the interface skill to identify implementation seams, create contract/interface files, create handoff READMEs, create a work-package map, decide parallel versus sequential implementation, and prepare coder dispatch prompts.",
+              "Use the interface skill to identify dependency boundaries, ownership boundaries, implementation seams, contract/interface files, handoff READMEs, a work-package map, parallel lanes, sequential lanes, and coder dispatch prompts.",
               "Loading the interface skill is not a reason to self-implement. The interface phase should normally create handoff artifacts and coder prompts, then dispatch coder agents for real coding work.",
               "The work-package map should explicitly separate tasks that are ready to run in parallel now from tasks that must wait for concrete previous output.",
               "For every task marked ready-now, prepare one nested coder task in the same implementation group unless there is a concrete file-ownership conflict.",
@@ -126,8 +126,11 @@ export function withCodeQualityBar(builder: Builder) {
         "Prefer reusable, composable code.",
         "Prefer clear boundaries between modules.",
         "Prefer explicit types, narrow interfaces, and small cohesive functions.",
+        "Write code that is easy to follow.",
+        "Make the structure tell the story.",
+        "Use names, modules, and boundaries that explain the design.",
         "Code should read like a well-structured technical narrative: each file should have a clear purpose, each abstraction should have a reason, and the flow should be easy to follow.",
-        "Document public interfaces when useful and clarify intent, invariants, public API behavior, or non-obvious decisions.",
+        "Add comments only when they clarify intent, invariants, tradeoffs, public API behavior, or non-obvious decisions.",
         "Do not add noisy comments that restate obvious code.",
         "Keep future change in mind without overengineering. Avoid hard-coding decisions that are likely to change.",
         "Prefer dependency injection, adapters, interfaces, protocols, traits, or similar patterns where appropriate for the language.",
@@ -161,6 +164,7 @@ export function withReviewLoop(builder: Builder) {
     title: "Review Loop",
     content: [
       "Review and reconcile coder output after implementation groups return. Do not immediately declare success. You are the reviewer and integrator.",
+      "Treat the review loop as a quality gate.",
       "Read grouped coder results.",
       "Inspect actual diffs with git diff/status or equivalent repository inspection.",
       "Compare changes against interface docs, handoff READMEs, work-package maps, shared types, schemas, protocols, and contracts.",
