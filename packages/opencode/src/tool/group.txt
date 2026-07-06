@@ -4,6 +4,8 @@ Use `group` to cluster related work into one coordinated bucket.
 
 A group is a cohort of nested task calls that share a common goal. Use it when several subagents should work in parallel lanes and return one grouped result after the whole cohort finishes.
 
+`group` is a scatter-gather tool for aggregation and synthesis. It is for related work with one shared objective, not arbitrary batching.
+
 Think of `group` as fan-out/fan-in:
 1. Fan out related work to several nested task calls.
 2. Let each task work independently inside its assigned ownership lane.
@@ -16,7 +18,7 @@ Use `group` when:
 - several agents can work in parallel
 - work can be divided into clear ownership lanes
 - one grouped result is more useful than separate scattered results
-- the orchestrator needs a planning, implementation, review, or verification bucket
+- a planning, implementation, review, or verification bucket is needed
 - independent perspectives should be collected, compared, aggregated, and synthesized
 
 Do not use `group` when:
@@ -24,7 +26,7 @@ Do not use `group` when:
 - the tasks are unrelated
 - the tasks must happen strictly one after another
 - agents would edit the same files without a clear ownership boundary
-- the model only wants to hide unrelated work inside one bucket
+- unrelated work would be hidden inside one bucket
 
 Grouping examples:
 - `environment-discovery`: several explore tasks inspect different parts of the repo
@@ -37,7 +39,7 @@ Grouping examples:
 Grouping rules:
 - One group equals one common goal.
 - Use separate groups for separate workstreams.
-- Use multiple group calls in the same assistant message when independent workstreams can run concurrently.
+- Emit multiple `group` calls in the same message when independent workstreams can run concurrently.
 - Keep each nested task scoped and non-overlapping.
 - Give each task a clear name, description, owned scope, expected result, and blocker protocol.
 - Include every ready sibling task that can safely work from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
@@ -47,32 +49,13 @@ Grouping rules:
 - Use `priority: medium` for normal implementation and review.
 - Use `priority: low` for cleanup, docs, or optional analysis.
 
-Preferred vocabulary:
-- group
-- bucket
-- cluster
-- cohort
-- workstream
-- common goal
-- shared objective
-- parallel lane
-- ownership lane
-- fan-out
-- fan-in
-- scatter-gather
-- grouped result
-- completion barrier
-- aggregation
-- synthesis
-- quality gate
-
 v1 constraints:
 - One `group` tool call represents one group.
 - v1 supports nested `task` calls only.
 - Inner task calls run concurrently.
 - Inner background tasks are not supported because group waits for foreground completion.
 - `fail_fast` is accepted for forward compatibility, but v1 returns all settled nested results.
-- If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. The caller should answer or ask the user, then redispatch only the affected task.
+- If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. Resolve the blocker, then redispatch only the affected task.
 - For nested coder tasks, prefer `input.handoff_files` for handoff READMEs, interface contracts, work-package maps, and context docs. Keep `input.prompt` focused on task goal, scope, constraints, and expected return format instead of pasting large handoff documents.
 
 Example:
@@ -93,7 +76,7 @@ Example:
           "docs/orchestration/feature/contracts.md",
           "docs/orchestration/feature/core-domain/README.md"
         ],
-        "prompt": "Read the handoff README first. Work only in the assigned core-domain scope unless a contract requires otherwise. Implement the public contracts, add focused tests, and return files changed, tests run, risks, and questions for orchestrator."
+        "prompt": "Read the handoff README first. Work only in the assigned core-domain scope unless a contract requires otherwise. Implement the public contracts, add focused tests, and return files changed, tests run, risks, and blockers."
       }
     },
     {
@@ -108,14 +91,14 @@ Example:
           "docs/orchestration/feature/contracts.md",
           "docs/orchestration/feature/adapter/README.md"
         ],
-        "prompt": "Read the handoff README first. Work only in the assigned adapter scope unless a contract requires otherwise. Implement the adapter contracts, add focused tests, and return files changed, tests run, risks, and questions for orchestrator."
+        "prompt": "Read the handoff README first. Work only in the assigned adapter scope unless a contract requires otherwise. Implement the adapter contracts, add focused tests, and return files changed, tests run, risks, and blockers."
       }
     }
   ]
 }
 
 Example with two independent groups:
-The assistant should emit two `group` tool calls in the same assistant message.
+Emit two `group` tool calls in the same message.
 
 Tool call 1:
 {
@@ -133,7 +116,7 @@ Tool call 2:
   "calls": [...]
 }
 
-Expected behavior:
+Completion behavior:
 - Group 1 returns when all implementation subtasks finish.
 - Group 2 returns when all review subtasks finish.
 - Whichever group finishes first is available first.

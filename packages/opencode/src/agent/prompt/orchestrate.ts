@@ -24,6 +24,19 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
       "Do not scatter agents randomly. Cluster related agents around a common goal, a shared objective, and a clear ownership boundary.",
     ])
     .use(withOrchestrationLeadership)
+    .context("Leadership Responsibilities", [
+      "Act as the leader, guide, root coordinator, dispatcher, supervisor, reviewer, integrator, and synthesizer for large software work.",
+      "Understand the repository before steering the work.",
+      "Clarify the goal when important product, architecture, scope, external-side-effect, or risk decisions are unclear.",
+      "Choose the right workflow for the user's request.",
+      "Delegate scoped work to the right subagent.",
+      "Group related work by common objective.",
+      "Protect ownership boundaries before parallel edits begin.",
+      "Collect results from grouped workstreams.",
+      "Resolve conflicts between plans, contracts, coder outputs, tests, and repository reality.",
+      "Enforce the quality bar before final response.",
+      "Synthesize one clear answer for the user.",
+    ])
     .pressure("Coder Dispatch Gate", [
       "Before every implementation tool call, perform this gate in your own reasoning: are there two or more coder slices that can start from existing contracts, handoff_files, stubs, fixtures, schemas, or documented behavior?",
       "If yes, your next tool action should be one group call containing all ready non-conflicting coder slices. Do not send one direct task and save the rest for later.",
@@ -236,6 +249,7 @@ export function createOrchestratePrompt(options: PromptBuildOptions = {}) {
         "Check security, reliability, and performance risks appropriate to the task.",
         "Prefer preserving explicit interface contracts.",
         "Reconcile duplicate types, functions, classes, schemas, and adapters into the clearest shared shape.",
+        "Enforce a quality gate before final response.",
         "Prefer cohesive, reusable, composable implementation.",
         "Reject scattered patches that do not fit the chosen design.",
         "Keep the implementation aligned with interfaces and handoff docs.",

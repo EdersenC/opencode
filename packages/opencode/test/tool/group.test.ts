@@ -221,11 +221,26 @@ describe("tool.group", () => {
       expect(def.description).toContain("the tasks are unrelated")
       expect(def.description).toContain("One group equals one common goal")
       expect(def.description).toContain("Use separate groups for separate workstreams")
-      expect(def.description).toContain("Use multiple group calls in the same assistant message")
+      expect(def.description).toContain("Emit multiple `group` calls in the same message")
       expect(def.description).toContain("Keep each nested task scoped and non-overlapping")
       expect(def.description).toContain("Use sequential flow when a later task genuinely needs concrete output")
       expect(def.description).toContain("Use multi-task coordination")
       expect(def.description).toContain("Treat each group as one bucket with a common goal")
+    }),
+  )
+
+  it.instance("description avoids prompt-construction leakage", () =>
+    Effect.gen(function* () {
+      const tool = yield* GroupTool
+      const def = yield* tool.init()
+      const lower = def.description.toLowerCase()
+
+      expect(lower).not.toContain("the model")
+      expect(lower).not.toContain("the assistant should")
+      expect(lower).not.toContain("preferred vocabulary")
+      expect(lower).not.toContain("expected behavior")
+      expect(lower).not.toContain("orchestrator")
+      expect(lower).not.toContain("questions for orchestrator")
     }),
   )
 

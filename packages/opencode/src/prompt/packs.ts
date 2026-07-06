@@ -59,9 +59,11 @@ export const ORCHESTRATION_VOCABULARY = {
     phrases: [
       "Use multi-task coordination when independent slices can advance together.",
       "Use parallel workstreams when slices can proceed independently.",
+      "Fan out independent work to subagents, then fan in one grouped result.",
       "Fan out related work to a cohort of subagents, then fan in the results.",
       "Group work by shared objective, not by random convenience.",
       "Treat each group as one bucket with a common goal, a grouped result, and a completion barrier.",
+      "Keep each workstream's ownership boundary clear.",
       "Use separate groups for separate workstreams.",
       "Avoid parallel edits to the same ownership boundary.",
     ],
