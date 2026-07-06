@@ -1,4 +1,5 @@
 import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
+import { withContractFirstHandoffForPlanner } from "@/prompt/packs"
 
 export function createPlannerPrompt(options: PromptBuildOptions = {}) {
   return PromptBuilder.create("planner")
@@ -38,6 +39,7 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
       "Name likely handoff boundaries and note when work should be parallel versus sequential.",
       "Mark which implementation slices can run in the same group after contracts exist, and which slices truly require concrete earlier output.",
     ])
+    .use(withContractFirstHandoffForPlanner)
     .qualityBar([
       "The recommended architecture should be concrete enough for implementation.",
       "The implementation phases should be ordered and scoped.",

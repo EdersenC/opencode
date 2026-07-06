@@ -1,6 +1,8 @@
 import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
 import {
+  withAutoLocalVerification,
   withCodeQualityBar,
+  withContractFirstHandoffForWorker,
   withInterfaceContractProtocol,
   withQuestionEscalationProtocol,
   withWorkerResultFormat,
@@ -29,6 +31,7 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
       "Add comments only when they clarify intent, invariants, tradeoffs, or public behavior.",
     ])
     .use((builder) => withInterfaceContractProtocol(builder, "worker"))
+    .use(withContractFirstHandoffForWorker)
     .use(withCodeQualityBar)
     .workflow("Testing And Verification", [
       "Add or update tests where practical.",
@@ -40,6 +43,7 @@ export function createCoderPrompt(options: PromptBuildOptions = {}) {
       "Do not claim success unless verification was run or you explain why it was not run.",
       "Do not hide skipped verification.",
     ])
+    .use(withAutoLocalVerification)
     .context("Orchestrator Review", [
       "Expect the orchestrator to review your work after you return.",
       "Return enough information for review: files changed, tests run, risks, unresolved questions, and any important decisions.",

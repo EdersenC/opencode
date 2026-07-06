@@ -34,6 +34,15 @@ function load<A>(fn: (svc: Agent.Interface) => Effect.Effect<A>) {
   return Agent.Service.use(fn)
 }
 
+function expectOrderedText(value: string, terms: string[]) {
+  terms.reduce((previous, term) => {
+    const current = value.indexOf(term)
+    expect(current).toBeGreaterThanOrEqual(0)
+    expect(current).toBeGreaterThan(previous)
+    return current
+  }, -1)
+}
+
 const expectDefaultAgentError = Effect.fn("AgentTest.expectDefaultAgentError")(function* (message: string) {
   const exit = yield* load((svc) => svc.defaultAgent()).pipe(Effect.exit)
   expect(Exit.isFailure(exit)).toBe(true)
@@ -176,10 +185,14 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("question tool")
     expect(lower).toContain("lead the work")
     expect(lower).toContain("root coordinator")
+    expect(lower).toContain("guide the system from the user's goal to a verified result")
+    expect(lower).toContain("choose the right workflow")
     expect(lower).toContain("act with leadership")
     expect(lower).toContain("shared objectives")
+    expect(lower).toContain("delegate scoped work")
     expect(lower).toContain("delegate scoped tasks")
     expect(lower).toContain("supervise results")
+    expect(lower).toContain("protect ownership boundaries")
     expect(lower).toContain("one coherent answer")
     expect(lower).toContain("do not scatter agents randomly")
     expect(lower).toContain("cluster related agents")
@@ -202,6 +215,15 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("do not let planner fanout substitute for user clarification")
     expect(lower).toContain("ask first, then plan")
     expect(lower).toContain("usually 1-3 questions")
+    expect(lower).toContain("discover: inspect the repo before planning")
+    expect(lower).toContain("clarify: use the question tool")
+    expect(lower).toContain("plan: for large or ambiguous tasks")
+    expect(lower).toContain("interface: before parallel coding")
+    expect(lower).toContain("dispatch: use group for implementation workstreams")
+    expect(lower).toContain("guide parallelism")
+    expect(lower).toContain("handle blockers")
+    expect(lower).toContain("review: after coder groups finish")
+    expect(lower).toContain("synthesize: return one concise final summary")
     expect(lower).toContain("coder dispatch gate")
     expect(lower).toContain("before every implementation tool call")
     expect(lower).toContain("one group call containing all ready non-conflicting coder slices")
@@ -210,13 +232,21 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("one group call equals one logical bucket")
     expect(lower).toContain("use multiple group calls in the same assistant message")
     expect(lower).toContain("cohort of subagents")
+    expect(lower).toContain("group related work into workstreams")
+    expect(lower).toContain("multi-task coordination")
     expect(lower).toContain("fan-out/fan-in execution")
+    expect(lower).toContain("fan out related work")
+    expect(lower).toContain("fan in the results")
     expect(lower).toContain("completion barrier")
     expect(lower).toContain("parallel lanes")
     expect(lower).toContain("separate workstreams")
+    expect(lower).toContain("cluster by objective")
+    expect(lower).toContain("use parallelism to reduce waiting")
+    expect(lower).toContain("use sequential flow when one result must feed the next")
     expect(lower).toContain("priority")
     expect(lower).toContain("avoid having two subagents edit the same file")
     expect(lower).toContain("after grouped results return")
+    expect(lower).toContain("for small tasks, do not orchestrate")
     expect(lower).toContain("for tiny edits")
     expect(lower).toContain("if the repo appears empty or uninitialized")
     expect(lower).toContain("fanout sizing protocol")
@@ -295,6 +325,9 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("update the relevant interface files or handoff readme")
     expect(lower).toContain("review and reconcile coder output")
     expect(lower).toContain("quality gate")
+    expect(lower).toContain("prefer cohesive, reusable, composable implementation")
+    expect(lower).toContain("reject scattered patches")
+    expect(lower).toContain("aligned with interfaces and handoff docs")
     expect(lower).toContain("do not immediately declare success")
     expect(lower).toContain("inspect actual diffs")
     expect(lower).toContain("git diff/status")
@@ -318,10 +351,55 @@ it.instance("orchestrate prompt documents grouped multi-plan workflow and questi
     expect(lower).toContain("subagent_type\": \"coder")
     expect(lower).toContain("subagent_type\": \"planner")
     expect(lower).toContain("auto mode awareness")
-    expect(lower).toContain("use local verification commands freely")
-    expect(lower).toContain("focused tests, typechecks, linters, and build commands")
-    expect(lower).toContain("auto does not mean external deploys, publishing, git pushes, or system mutations are safe")
-    expect(lower).toContain("continue asking the user for product, architecture")
+    expect(lower).toContain("focused project-local verification commands freely")
+    expect(lower).toContain("auto does not approve deploys, publishing, git pushes, or system mutation")
+    expect(lower).toContain("do not deploy, publish, push, or mutate system paths through auto")
+    expect(lower).toContain("report verification honestly")
+    expect(lower).toContain("ask the user only for product, architecture")
+  }),
+)
+
+it.instance("orchestrate prompt keeps lifecycle stages and role transitions in order", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const lower = (orchestrate?.prompt ?? "").toLowerCase()
+
+    expectOrderedText(lower, [
+      "discover: inspect the repo before planning",
+      "clarify: use the question tool",
+      "plan: for large or ambiguous tasks",
+      "interface: before parallel coding",
+      "dispatch: use group for implementation workstreams",
+      "guide parallelism",
+      "handle blockers",
+      "review: after coder groups finish",
+      "synthesize: return one concise final summary",
+    ])
+
+    expectOrderedText(lower, [
+      "launch a high-priority group named multi-plan-generation",
+      "after plan selection, use the interface skill",
+      "after interface preparation, launch grouped implementation tasks",
+    ])
+  }),
+)
+
+it.instance("orchestrate prompt preserves small-task direct-tool exception", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const lower = (orchestrate?.prompt ?? "").toLowerCase()
+
+    expectOrderedText(lower, [
+      "for small tasks, do not orchestrate",
+      "use direct read, edit, and bash tools",
+      "one file is involved",
+      "the fix is obvious",
+      "subagents would add overhead",
+      "no parallelism is useful",
+      "no architecture decision is needed",
+    ])
+    expect(lower).toContain("use grouped subagents when the task has multiple parts")
+    expect(lower).toContain("for large or ambiguous tasks, launch a high-priority group")
   }),
 )
 

@@ -1,20 +1,274 @@
-import { PromptBuilder } from "./builder"
+import { PromptBuilder, type PromptSegmentKind } from "./builder"
 
 type Builder = PromptBuilder.Builder
+type VocabularyPack = {
+  title: string
+  purpose: string
+  words: readonly string[]
+  phrases: readonly string[]
+}
+
+export const ORCHESTRATION_VOCABULARY = {
+  "orchestration-leadership": {
+    title: "Orchestration Leadership",
+    purpose: "Gives the root agent leadership language.",
+    words: [
+      "lead",
+      "guide",
+      "coordinate",
+      "supervise",
+      "align",
+      "direct",
+      "decide",
+      "delegate",
+      "dispatch",
+      "synthesize",
+      "reconcile",
+      "review",
+      "quality gate",
+    ],
+    phrases: [
+      "Lead the work as the root coordinator.",
+      "Act with leadership: direct, align, supervise, decide, delegate, dispatch, review, reconcile, and synthesize.",
+      "Guide the system through discovery, planning, implementation, review, and final synthesis.",
+      "Delegate scoped tasks, supervise results, and keep every workstream aligned around shared objectives.",
+      "Delegate scoped work to the right subagent.",
+      "Keep the user's goal and the repository's constraints aligned.",
+      "Collect results and synthesize one coherent answer.",
+    ],
+  },
+  "parallel-workstreams": {
+    title: "Parallel Workstreams",
+    purpose: "Pushes the agent toward grouped parallelism when the task naturally separates.",
+    words: [
+      "parallel",
+      "multi-task",
+      "concurrent",
+      "fan-out",
+      "fan-in",
+      "scatter-gather",
+      "cluster",
+      "cohort",
+      "bucket",
+      "workstream",
+      "parallel lane",
+      "independent slice",
+      "completion barrier",
+      "aggregation",
+    ],
+    phrases: [
+      "Use multi-task coordination when independent slices can advance together.",
+      "Use parallel workstreams when slices can proceed independently.",
+      "Fan out related work to a cohort of subagents, then fan in the results.",
+      "Group work by shared objective, not by random convenience.",
+      "Use separate groups for separate workstreams.",
+      "Avoid parallel edits to the same ownership boundary.",
+    ],
+  },
+  "contract-first-handoff": {
+    title: "Contract-First Handoff",
+    purpose: "Guides interface-first implementation before coder dispatch.",
+    words: [
+      "contract",
+      "interface",
+      "boundary",
+      "ownership",
+      "dependency",
+      "handoff",
+      "README",
+      "work-package map",
+      "shared type",
+      "public API",
+      "adapter",
+      "protocol",
+      "trait",
+      "DTO",
+      "schema",
+    ],
+    phrases: [
+      "Create contracts before dispatching coders.",
+      "Define ownership boundaries before parallel edits begin.",
+      "Give each coder a handoff document and a clear owned scope.",
+      "Mark shared contracts as coordination points.",
+      "Update the contract before redispatching a coder when requirements change.",
+    ],
+  },
+  "quality-coding": {
+    title: "Quality Coding",
+    purpose: "Guides coder agents toward maintainable implementation.",
+    words: [
+      "reusable",
+      "composable",
+      "cohesive",
+      "maintainable",
+      "focused",
+      "explicit",
+      "readable",
+      "testable",
+      "intention-revealing",
+      "boundary-respecting",
+    ],
+    phrases: [
+      "Write code that is easy to follow.",
+      "Make the structure tell the story.",
+      "Use names, modules, and boundaries that explain the design.",
+      "Document intent, invariants, tradeoffs, and public behavior.",
+      "Do not add noisy comments that restate obvious code.",
+    ],
+  },
+  "review-reconciliation": {
+    title: "Review Reconciliation",
+    purpose: "Guides orchestrate into reviewer and integrator behavior.",
+    words: [
+      "inspect",
+      "compare",
+      "reconcile",
+      "verify",
+      "quality gate",
+      "conflict",
+      "regression",
+      "integration",
+      "focused fix",
+      "redispatch",
+      "synthesis",
+    ],
+    phrases: [
+      "Do not declare success before review.",
+      "Inspect actual diffs after coder groups finish.",
+      "Compare implementation against handoff contracts.",
+      "Fix small issues directly.",
+      "Redispatch targeted coder tasks for larger slice-specific issues.",
+      "Limit review loops to avoid infinite churn.",
+    ],
+  },
+  "auto-local-verification": {
+    title: "AUTO Mode Awareness",
+    purpose: "Guides agents to use AUTO safely.",
+    words: [
+      "local verification",
+      "focused tests",
+      "typecheck",
+      "lint",
+      "build",
+      "project-local",
+      "no deploy",
+      "no publish",
+      "no push",
+      "no system mutation",
+    ],
+    phrases: [
+      "When AUTO mode is active, run focused project-local verification commands freely.",
+      "Do not treat AUTO as approval for external side effects.",
+      "AUTO does not approve deploys, publishing, git pushes, or system mutation.",
+      "Do not deploy, publish, push, or mutate system paths through AUTO.",
+      "Report verification honestly, including commands run and checks skipped.",
+    ],
+  },
+} satisfies Record<string, VocabularyPack>
+
+export type OrchestrationVocabularyPackName = keyof typeof ORCHESTRATION_VOCABULARY
+
+export function orchestrationVocabularyPackNames() {
+  return Object.keys(ORCHESTRATION_VOCABULARY) as OrchestrationVocabularyPackName[]
+}
+
+export function renderOrchestrationVocabularyPack(name: OrchestrationVocabularyPackName) {
+  return [...ORCHESTRATION_VOCABULARY[name].phrases]
+}
+
+export function requiredOrchestrationVocabulary(name: OrchestrationVocabularyPackName) {
+  return [...ORCHESTRATION_VOCABULARY[name].words, ...ORCHESTRATION_VOCABULARY[name].phrases]
+}
+
+function withVocabularyPack(builder: Builder, name: OrchestrationVocabularyPackName, kind: PromptSegmentKind = "context") {
+  const pack = ORCHESTRATION_VOCABULARY[name]
+  return builder.segment({
+    id: `pack.vocabulary.${name}`,
+    kind,
+    title: pack.title,
+    content: pack.phrases,
+    metadata: {
+      vocabularyPack: name,
+      purpose: pack.purpose,
+      words: pack.words,
+    },
+  })
+}
+
+export function withOrchestrationLeadership(builder: Builder) {
+  return withVocabularyPack(builder, "orchestration-leadership", "workflow")
+}
+
+export function withParallelWorkstreams(builder: Builder) {
+  return withVocabularyPack(builder, "parallel-workstreams", "tool_guidance")
+}
+
+export function withContractFirstHandoff(builder: Builder) {
+  return withVocabularyPack(builder, "contract-first-handoff", "tool_guidance")
+}
+
+export function withContractFirstHandoffForWorker(builder: Builder) {
+  return builder.segment({
+    id: "pack.vocabulary.contract-first-handoff.worker",
+    kind: "tool_guidance",
+    title: ORCHESTRATION_VOCABULARY["contract-first-handoff"].title,
+    content: [
+      "Treat contracts, interface files, and handoff READMEs as the source of truth.",
+      "Respect ownership boundaries before editing.",
+      "Use the handoff document to understand dependencies, shared types, public APIs, adapters, protocols, traits, DTOs, and schemas.",
+      "Do not change shared contracts silently.",
+      "Report contract gaps to the orchestrator before inventing incompatible behavior.",
+    ],
+    metadata: {
+      vocabularyPack: "contract-first-handoff",
+      purpose: ORCHESTRATION_VOCABULARY["contract-first-handoff"].purpose,
+      words: ORCHESTRATION_VOCABULARY["contract-first-handoff"].words,
+    },
+  })
+}
+
+export function withContractFirstHandoffForPlanner(builder: Builder) {
+  return builder.segment({
+    id: "pack.vocabulary.contract-first-handoff.planner",
+    kind: "tool_guidance",
+    title: ORCHESTRATION_VOCABULARY["contract-first-handoff"].title,
+    content: [
+      "Plan the contracts, interfaces, ownership boundaries, dependencies, handoff READMEs, and work-package map the orchestrator will need before coder dispatch.",
+      "Name shared types, public APIs, adapters, protocols, traits, DTOs, schemas, or equivalent boundaries when they matter.",
+      "Separate parallel-ready slices from slices that require sequential ordering.",
+    ],
+    metadata: {
+      vocabularyPack: "contract-first-handoff",
+      purpose: ORCHESTRATION_VOCABULARY["contract-first-handoff"].purpose,
+      words: ORCHESTRATION_VOCABULARY["contract-first-handoff"].words,
+    },
+  })
+}
+
+export function withQualityCoding(builder: Builder) {
+  return withVocabularyPack(builder, "quality-coding", "quality_bar")
+}
+
+export function withReviewReconciliation(builder: Builder) {
+  return withVocabularyPack(builder, "review-reconciliation", "workflow")
+}
+
+export function withAutoLocalVerification(builder: Builder) {
+  return withVocabularyPack(builder, "auto-local-verification", "tool_guidance")
+}
 
 export function withOrchestrationLifecycle(builder: Builder) {
   return builder
     .workflow("Core Workflow", [
-      "Map the repo and identify the project shape.",
-      "Ask clarification questions when requirements, product direction, success criteria, or constraints are not nailed down.",
-      "Fan out planner agents through group when the task is complex.",
-      "Collect plans, compare them, and select or recommend one path.",
-      "Use the interface skill for contract-first handoff when multiple coders will share boundaries.",
-      "Create contract/interface files, handoff READMEs, and a work-package map.",
-      "Dispatch all ready coder agents through group in the fewest safe dependency layers.",
-      "Fan in grouped results, review them, and reconcile conflicts.",
-      "Run verification as the final quality gate.",
-      "Report one coherent final result.",
+      "Discover: inspect the repo before planning when context is missing. Identify project type, language, framework, conventions, and whether the repo is empty.",
+      "Clarify: use the question tool for important ambiguity. Ask compact, high-leverage questions. Do not ask questions the repo can answer.",
+      "Plan: for large or ambiguous tasks, launch a high-priority group named multi-plan-generation with 2-4 planner agents using different angles. Collect the plans, synthesize tradeoffs, and choose a clear winner or ask the user to choose when the decision changes product direction, architecture, dependency risk, cost, or scope.",
+      "Interface: before parallel coding, use the interface skill. Create handoff READMEs, work-package maps, interface contracts, shared types, schemas, adapter boundaries, or equivalent coordination artifacts.",
+      "Dispatch: use group for implementation workstreams. Cluster coder tasks by shared objective and give each coder the user goal, selected plan, owned scope, handoff README path, interface contracts, files to avoid, expected tests, and blocker protocol.",
+      "Guide parallelism: use parallel lanes only when work can proceed independently. Avoid overlapping edits. Use separate groups for separate workstreams and sequential steps when one result must feed the next.",
+      "Handle blockers: inspect coder results for questions and blockers. Answer from context when possible, ask the user only for product, architecture, scope, external-side-effect, or high-risk decisions, and update contracts before redispatching affected coders.",
+      "Review: after coder groups finish, inspect actual diffs, compare implementation against contracts, run focused verification, check quality, naming, boundaries, tests, and regressions, then fix small issues directly or redispatch targeted coder tasks.",
+      "Synthesize: return one concise final summary with what changed, important files, tests or checks run, unresolved risks, decisions made, and next steps if any.",
     ])
     .when({ profile: ["explicit", "debug"] }, (prompt) =>
       prompt.segment({
@@ -117,7 +371,7 @@ export function withQuestionEscalationProtocol(builder: Builder, target: "orches
 }
 
 export function withCodeQualityBar(builder: Builder) {
-  return builder
+  return withQualityCoding(builder)
     .segment({
       id: "pack.code_quality_bar",
       kind: "quality_bar",
@@ -126,12 +380,7 @@ export function withCodeQualityBar(builder: Builder) {
         "Prefer reusable, composable code.",
         "Prefer clear boundaries between modules.",
         "Prefer explicit types, narrow interfaces, and small cohesive functions.",
-        "Write code that is easy to follow.",
-        "Make the structure tell the story.",
-        "Use names, modules, and boundaries that explain the design.",
         "Code should read like a well-structured technical narrative: each file should have a clear purpose, each abstraction should have a reason, and the flow should be easy to follow.",
-        "Add comments only when they clarify intent, invariants, tradeoffs, public API behavior, or non-obvious decisions.",
-        "Do not add noisy comments that restate obvious code.",
         "Keep future change in mind without overengineering. Avoid hard-coding decisions that are likely to change.",
         "Prefer dependency injection, adapters, interfaces, protocols, traits, or similar patterns where appropriate for the language.",
       ],
