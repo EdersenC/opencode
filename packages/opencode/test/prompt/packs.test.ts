@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createCoderPrompt } from "@/agent/prompt/coder"
 import { createOrchestratePrompt } from "@/agent/prompt/orchestrate"
+import { createPlannerPrompt } from "@/agent/prompt/planner"
 import { PromptBuilder, type PromptBuildOptions } from "@/prompt/builder"
 import {
   ORCHESTRATION_VOCABULARY,
@@ -164,6 +165,31 @@ describe("orchestration vocabulary packs", () => {
     expectContainsAll(interfaceSkill, ["contract", "ownership boundary", "work-package map", "handoff README"])
 
     expect(requiredOrchestrationVocabulary("parallel-workstreams")).toContain("fan-out")
+  })
+
+  test("planner coder and interface skill share handoff terminology", async () => {
+    const interfaceSkill = await Bun.file(
+      new URL("../../../core/src/plugin/skill/interface.md", import.meta.url),
+    ).text()
+    const planner = createPlannerPrompt()
+    const coder = createCoderPrompt()
+
+    for (const value of [planner, coder, interfaceSkill]) {
+      expectContainsAll(value, [
+        "selected plan",
+        "interface contract",
+        "handoff README",
+        "work-package",
+        "ownership lane",
+        "dependency boundary",
+        "implementation slice",
+        "review focus",
+        "correctness criteria",
+      ])
+    }
+
+    expectContainsAll(coder, ["blocker", "orchestrator"])
+    expectContainsAll(interfaceSkill, ["blocker", "orchestrator"])
   })
 })
 

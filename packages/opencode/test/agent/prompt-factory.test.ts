@@ -63,11 +63,15 @@ describe("agent prompt factories", () => {
 
     expect(prompt).toContain("# Role")
     expect(lower).toContain("you are the planner subagent")
-    expect(lower).toContain("produce exactly one plan")
+    expect(lower).toContain("create one concrete plan for the assigned angle")
+    expect(lower).toContain("produce exactly one concrete")
     expect(lower).toContain("stay read-only")
     expect(lower).toContain("repo inspection")
     expect(lower).toContain("planning angle")
     expect(lower).toContain("recommended coder work packages")
+    expect(lower).toContain("<chosen_approach>")
+    expect(lower).toContain("<interface_boundaries>")
+    expect(lower).toContain("<work_package_candidates>")
     expect(lower).toContain("<verification_strategy>")
   })
 
@@ -78,6 +82,7 @@ describe("agent prompt factories", () => {
     expect(prompt).toContain("# Role")
     expect(lower).toContain("you are the coder subagent")
     expect(lower).toContain("scoped work package")
+    expect(lower).toContain("read the handoff readme and interface contracts first")
     expect(lower).toContain("handoff_files")
     expect(lower).toContain("read it first")
     expect(lower).toContain("assume the handoff files contain the detailed context")
@@ -94,6 +99,8 @@ describe("agent prompt factories", () => {
     expect(lower).toContain("code quality bar")
     expect(lower).toContain("auto mode")
     expect(lower).toContain("report all commands run")
+    expect(lower).toContain("<handoff_docs_read>")
+    expect(lower).toContain("<contracts_implemented>")
   })
 
   test("compiled prompts are deterministic", () => {

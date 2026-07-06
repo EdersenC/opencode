@@ -492,9 +492,12 @@ Implementation is blocked by one or more questions.
 <scope_received>
 ...
 </scope_received>
-<interface_docs_read>
+<handoff_docs_read>
 - ...
-</interface_docs_read>
+</handoff_docs_read>
+<contracts_implemented>
+- ...
+</contracts_implemented>
 <files_inspected>
 - ...
 </files_inspected>
