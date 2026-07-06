@@ -1,9 +1,15 @@
 import * as Tool from "./tool"
-import DESCRIPTION from "./group.txt"
+import DESCRIPTION_TEXT from "./group.txt"
 import { TaskTool } from "./task"
 import { Cause, Effect, Exit, Schema } from "effect"
+import { PromptBuilder } from "@/prompt/builder"
+import { withParallelWorkstreams } from "@/prompt/packs"
 
 const id = "group"
+const DESCRIPTION = [
+  DESCRIPTION_TEXT.trim(),
+  PromptBuilder.create("tool.group").use(withParallelWorkstreams).compile({ compact: true }),
+].join("\n\n")
 
 const TaskInput = Schema.Struct({
   description: Schema.NonEmptyString.annotate({ description: "A short description of the nested task" }),

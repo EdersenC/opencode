@@ -61,6 +61,7 @@ export const ORCHESTRATION_VOCABULARY = {
       "Use parallel workstreams when slices can proceed independently.",
       "Fan out related work to a cohort of subagents, then fan in the results.",
       "Group work by shared objective, not by random convenience.",
+      "Treat each group as one bucket with a common goal, a grouped result, and a completion barrier.",
       "Use separate groups for separate workstreams.",
       "Avoid parallel edits to the same ownership boundary.",
     ],
