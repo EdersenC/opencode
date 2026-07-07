@@ -11,7 +11,7 @@ type VocabularyPack = {
 export const ORCHESTRATION_VOCABULARY = {
   "orchestration-leadership": {
     title: "Orchestration Leadership",
-    purpose: "Gives the root agent leadership language.",
+    purpose: "Gives the root agent clear leadership and coordination language.",
     words: [
       "lead",
       "guide",
@@ -28,18 +28,18 @@ export const ORCHESTRATION_VOCABULARY = {
       "quality gate",
     ],
     phrases: [
-      "Lead the work as the root coordinator.",
+      "Lead the work as the root coordinator. Set direction, preserve context, and keep the effort moving toward a verified result.",
       "Act with leadership: direct, align, supervise, decide, delegate, dispatch, review, reconcile, and synthesize.",
-      "Guide the system through discovery, planning, implementation, review, and final synthesis.",
+      "Guide the system through discovery, planning, implementation, review, and final synthesis with clear ownership at every step.",
       "Delegate scoped tasks, supervise results, and keep every workstream aligned around shared objectives.",
       "Delegate scoped work to the right subagent.",
       "Keep the user's goal and the repository's constraints aligned.",
-      "Collect results and synthesize one coherent answer.",
+      "Collect results, resolve conflicts, and synthesize one coherent answer.",
     ],
   },
   "parallel-workstreams": {
     title: "Parallel Workstreams",
-    purpose: "Pushes the agent toward grouped parallelism when the task naturally separates.",
+    purpose: "Pushes the agent toward grouped parallelism when work naturally separates into safe lanes.",
     words: [
       "parallel",
       "multi-task",
@@ -60,7 +60,7 @@ export const ORCHESTRATION_VOCABULARY = {
       "Use multi-task coordination when independent slices can advance together.",
       "Use parallel workstreams when slices can proceed independently.",
       "Fan out independent work to subagents, then fan in one grouped result.",
-      "Fan out related work to a cohort of subagents, then fan in the results.",
+      "Fan out related work to a cohort of subagents, then fan in the results through one grouped synthesis.",
       "Group work by shared objective, not by random convenience.",
       "Treat each group as one bucket with a common goal, a grouped result, and a completion barrier.",
       "Keep each workstream's ownership boundary clear.",
@@ -70,7 +70,7 @@ export const ORCHESTRATION_VOCABULARY = {
   },
   "contract-first-handoff": {
     title: "Contract-First Handoff",
-    purpose: "Guides interface-first implementation before coder dispatch.",
+    purpose: "Guides contract-first handoff before coder dispatch.",
     words: [
       "contract",
       "interface",
@@ -98,7 +98,7 @@ export const ORCHESTRATION_VOCABULARY = {
   },
   "quality-coding": {
     title: "Quality Coding",
-    purpose: "Guides coder agents toward maintainable implementation.",
+    purpose: "Guides coder agents toward readable, maintainable implementation.",
     words: [
       "reusable",
       "composable",
@@ -115,13 +115,13 @@ export const ORCHESTRATION_VOCABULARY = {
       "Write code that is easy to follow.",
       "Make the structure tell the story.",
       "Use names, modules, and boundaries that explain the design.",
-      "Document intent, invariants, tradeoffs, and public behavior.",
+      "Document intent, invariants, tradeoffs, and public behavior when the code cannot express them clearly on its own.",
       "Do not add noisy comments that restate obvious code.",
     ],
   },
   "review-reconciliation": {
     title: "Review Reconciliation",
-    purpose: "Guides orchestrate into reviewer and integrator behavior.",
+    purpose: "Guides orchestrate into reviewer, integrator, and final synthesis behavior.",
     words: [
       "inspect",
       "compare",
@@ -139,14 +139,14 @@ export const ORCHESTRATION_VOCABULARY = {
       "Do not declare success before review.",
       "Inspect actual diffs after coder groups finish.",
       "Compare implementation against handoff contracts.",
-      "Fix small issues directly.",
+      "Fix small issues directly when that is faster and lower risk than redispatch.",
       "Redispatch targeted coder tasks for larger slice-specific issues.",
       "Limit review loops to avoid infinite churn.",
     ],
   },
   "auto-local-verification": {
     title: "AUTO Mode Awareness",
-    purpose: "Guides agents to use AUTO safely.",
+    purpose: "Guides agents to use AUTO safely for local verification.",
     words: [
       "local verification",
       "focused tests",

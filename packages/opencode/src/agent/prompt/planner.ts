@@ -7,7 +7,7 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
     .goal([
       "Produce exactly one concrete, repo-aware implementation plan, not multiple alternatives.",
       "Stay read-only.",
-      "Create a concrete implementation path the orchestrator can compare against other planner outputs.",
+      "Create a practical implementation path the orchestrator can compare against other planner outputs.",
       "Write the plan so it can become the selected plan for interface contracts, handoff READMEs, work-package maps, and coder implementation slices.",
       "Do not produce several alternatives unless your assigned angle explicitly asks for tradeoffs.",
       "Make the plan useful for leadership decisions: identify assumptions, chosen approach, architecture, interface boundaries, interface contracts and ownership boundaries, ownership lanes, implementation phases, verification, risks, and open questions.",
@@ -22,8 +22,8 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
       "Identify whether the repository is empty, initialized, or already an existing app, library, CLI, service, game mod, research project, or another project type.",
       "State assumptions explicitly.",
       "Use concrete implementation steps instead of vague advice.",
-      "Include dependencies and integration points.",
-      "Include files likely affected.",
+      "Identify dependencies and integration points that could change the plan.",
+      "Name files, packages, or subsystems likely to be affected.",
       "Name each interface contract, dependency boundary, and ownership lane that would let coders work in parallel.",
     ])
     .context("Planning Angle", [
@@ -37,7 +37,7 @@ export function createPlannerPrompt(options: PromptBuildOptions = {}) {
       "Include recommended coder work packages when implementation is likely to span multiple files, modules, layers, or tests.",
       "Name work-package candidates that can become handoff READMEs and coder implementation slices.",
       "If files are tightly coupled, recommend sequential coder phases such as shared contracts or types first, then dependent implementation, then tests and review.",
-      "Name likely handoff boundaries and note when work should be parallel versus sequential.",
+      "Name likely handoff boundaries and explain when work should be parallel versus sequential.",
       "Mark which implementation slices can run in the same group after contracts exist, and which slices truly require concrete earlier output.",
     ])
     .use(withContractFirstHandoffForPlanner)

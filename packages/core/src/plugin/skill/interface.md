@@ -8,6 +8,8 @@ Prepare the ground before coders edit files. Create the contracts, handoff docum
 Use contract-first interfaces to define the coordination surface before implementation begins.
 Treat each ownership lane as one of the ownership boundaries for an implementation slice.
 Name the ownership boundary before dispatch so each coder knows where their work starts and stops.
+Make the handoff easy to execute: coders should be able to read their README, inspect the named contracts, and start without guessing at hidden decisions.
+Make the review easy to perform: the orchestrator should be able to compare each implementation slice against its correctness criteria and review focus.
 
 ## When To Use
 
@@ -37,6 +39,7 @@ Name the ownership boundary before dispatch so each coder knows where their work
 8. Produce coder dispatch prompts.
 9. Mark the ready-now coder batch separately from tasks that are blocked by unresolved dependencies.
 10. Name the review focus for each work package so the orchestrator can reconcile results after fan-in.
+11. Keep the handoff concise enough for coders to act on it, but specific enough to prevent conflicting assumptions.
 
 ## Interface Contracts
 
@@ -59,6 +62,7 @@ Each interface contract should record:
 - What correctness means for the contract.
 - Which compatibility or public API constraints must not be silently broken.
 - Which tests or checks prove the contract is respected.
+- Which assumptions must be escalated as blocker questions instead of guessed locally.
 
 ## Recommended Artifacts
 
@@ -86,6 +90,7 @@ Each coder should receive a clear ownership slice:
 - Review focus for the orchestrator after implementation.
 - Expected tests and verification commands.
 - Known risks and escalation questions.
+- Blocker rules for contract gaps, ownership conflicts, missing dependencies, and unsafe defaults.
 
 Avoid overlapping edit scopes. If overlap is unavoidable, make one task own the shared contract and make other tasks depend on it.
 
@@ -127,6 +132,7 @@ Each coder prompt should include:
 Tell coders to read the handoff README first, treat interface contracts as source of truth, avoid changing shared contracts unless explicitly instructed, and report contract gaps or conflicts back to the orchestrator instead of silently inventing incompatible behavior.
 
 Keep coder prompts short. Put detailed contracts, handoff READMEs, and work-package maps in `handoff_files` so the coder reads the source artifact instead of a huge pasted prompt.
+The prompt should point to the artifact; the artifact should carry the details.
 
 ## Required Handoff README Template
 

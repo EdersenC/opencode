@@ -2,9 +2,9 @@
 
 Use `group` to cluster related work into one coordinated bucket.
 
-A group is a cohort of nested task calls that share a common goal. Use it when several subagents should work in parallel lanes and return one grouped result after the whole cohort finishes.
+A group is a cohort of nested task calls that share a common goal. Use it when several subagents can work in parallel lanes and return one grouped result after the whole cohort finishes.
 
-`group` is a scatter-gather tool for aggregation and synthesis. It is for related work with one shared objective, not arbitrary batching.
+`group` is a scatter-gather tool for aggregation and synthesis. It is for related work with one shared objective, not arbitrary batching. Treat each group as a workstream: one bucket, one objective, one completion barrier, one grouped result.
 
 Think of `group` as fan-out/fan-in:
 1. Fan out related work to several nested task calls.
@@ -20,6 +20,7 @@ Use `group` when:
 - one grouped result is more useful than separate scattered results
 - a planning, implementation, review, or verification bucket is needed
 - independent perspectives should be collected, compared, aggregated, and synthesized
+- a ready batch should move together instead of being split into avoidable waits
 
 Do not use `group` when:
 - one direct tool call or one direct task call is enough
@@ -45,6 +46,7 @@ Grouping rules:
 - Include every ready sibling task that can safely work from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
 - Do not drip-feed ready sibling tasks one at a time when they can run in the same group.
 - Use sequential flow when a later task genuinely needs concrete output from an earlier task and written contracts are not enough.
+- Prefer a wider safe cohort over several narrow calls when ownership lanes are clear.
 - Use `priority: high` for blockers, critical implementation, or validation gates.
 - Use `priority: medium` for normal implementation and review.
 - Use `priority: low` for cleanup, docs, or optional analysis.
