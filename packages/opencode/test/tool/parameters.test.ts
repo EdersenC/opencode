@@ -12,6 +12,7 @@ import { ToolJsonSchema } from "../../src/tool/json-schema"
 import { Parameters as ApplyPatch } from "../../src/tool/apply_patch"
 import { Parameters as Edit } from "../../src/tool/edit"
 import { Parameters as Glob } from "../../src/tool/glob"
+import { Parameters as Group } from "../../src/tool/group"
 import { Parameters as Grep } from "../../src/tool/grep"
 import { Parameters as Invalid } from "../../src/tool/invalid"
 import { Parameters as Lsp } from "../../src/tool/lsp"
@@ -163,6 +164,53 @@ describe("tool parameters", () => {
     })
   })
 
+  describe("group", () => {
+    const valid = {
+      name: "feature-implementation",
+      description: "Implement feature pieces together.",
+      calls: [
+        {
+          tool: "task",
+          name: "runtime",
+          description: "Implement runtime",
+          input: {
+            description: "Implement runtime",
+            prompt: "Build the runtime behavior.",
+            subagent_type: "general",
+          },
+        },
+      ],
+    }
+
+    test("defaults priority to medium", () => {
+      expect(parse(Group, valid).priority).toBe("medium")
+    })
+    test("accepts explicit priority", () => {
+      expect(parse(Group, { ...valid, priority: "high" }).priority).toBe("high")
+    })
+    test("accepts nested task handoff files", () => {
+      const parsed = parse(Group, {
+        ...valid,
+        calls: [
+          {
+            ...valid.calls[0],
+            input: {
+              ...valid.calls[0].input,
+              handoff_files: ["docs/orchestration/feature/contracts.md"],
+            },
+          },
+        ],
+      })
+      expect(parsed.calls[0]?.input.handoff_files).toEqual(["docs/orchestration/feature/contracts.md"])
+    })
+    test("rejects missing or empty group fields", () => {
+      expect(accepts(Group, { ...valid, name: "" })).toBe(false)
+      expect(accepts(Group, { ...valid, description: "" })).toBe(false)
+      expect(accepts(Group, { ...valid, calls: [] })).toBe(false)
+      expect(accepts(Group, { ...valid, priority: "urgent" })).toBe(false)
+    })
+  })
+
   describe("invalid", () => {
     test("accepts tool + error", () => {
       expect(parse(Invalid, { tool: "foo", error: "bar" })).toEqual({ tool: "foo", error: "bar" })
@@ -242,6 +290,15 @@ describe("tool parameters", () => {
     test("accepts optional background flag", () => {
       const parsed = parse(Task, { description: "d", prompt: "p", subagent_type: "general", background: true })
       expect(parsed.background).toBe(true)
+    })
+    test("accepts optional handoff files", () => {
+      const parsed = parse(Task, {
+        description: "d",
+        prompt: "p",
+        subagent_type: "coder",
+        handoff_files: ["docs/orchestration/feature/contracts.md"],
+      })
+      expect(parsed.handoff_files).toEqual(["docs/orchestration/feature/contracts.md"])
     })
     test("rejects missing prompt", () => {
       expect(accepts(Task, { description: "d", subagent_type: "general" })).toBe(false)

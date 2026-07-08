@@ -53,6 +53,7 @@ import type {
   RunCommand,
   RunDiffStyle,
   RunInput,
+  RunPermissionMode,
   RunPrompt,
   RunProvider,
   RunResource,
@@ -85,8 +86,10 @@ type RunFooterOptions = {
   keymap: Keymap<Renderable, KeyEvent>
   tuiConfig: RunTuiConfig
   backgroundSubagents: boolean
+  autoPermission: boolean
   diffStyle: RunDiffStyle
   onPermissionReply: (input: PermissionReply) => void | Promise<void>
+  onPermissionModeSelect?: (mode: RunPermissionMode) => void
   onQuestionReply: (input: QuestionReply) => void | Promise<void>
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycleVariant?: () => CycleResult | void
@@ -157,6 +160,10 @@ function eventPatch(next: FooterEvent): FooterPatch | undefined {
     }
   }
 
+  if (next.type === "session.timing") {
+    return { timing: next.timing }
+  }
+
   if (next.type === "stream.patch") {
     return next.patch
   }
@@ -192,6 +199,8 @@ export class RunFooter implements FooterApi {
   private setVariants: Setter<string[]>
   private currentVariant: Accessor<string | undefined>
   private setCurrentVariant: Setter<string | undefined>
+  private autoPermission: Accessor<boolean>
+  private setAutoPermission: Setter<boolean>
   private theme: Accessor<RunTheme>
   private setTheme: Setter<RunTheme>
   private state: Accessor<FooterState>
@@ -241,7 +250,7 @@ export class RunFooter implements FooterApi {
       status: "",
       queue: 0,
       model: options.modelLabel,
-      duration: "",
+      timing: "",
       usage: "",
       first: options.first,
       interrupt: 0,
@@ -273,6 +282,9 @@ export class RunFooter implements FooterApi {
     const [currentVariant, setCurrentVariant] = createSignal(options.variant)
     this.currentVariant = currentVariant
     this.setCurrentVariant = setCurrentVariant
+    const [autoPermission, setAutoPermission] = createSignal(options.autoPermission)
+    this.autoPermission = autoPermission
+    this.setAutoPermission = setAutoPermission
     const [theme, setTheme] = createSignal(options.theme)
     this.theme = theme
     this.setTheme = setTheme
@@ -321,10 +333,12 @@ export class RunFooter implements FooterApi {
               diffStyle: options.diffStyle,
               tuiConfig: options.tuiConfig,
               backgroundSubagents: options.backgroundSubagents,
+              autoPermission: footer.autoPermission,
               history: options.history,
               agent: options.agentLabel,
               onSubmit: footer.handlePrompt,
               onPermissionReply: footer.handlePermissionReply,
+              onPermissionModeSelect: footer.handlePermissionModeSelect,
               onQuestionReply: footer.handleQuestionReply,
               onQuestionReject: footer.handleQuestionReject,
               onCycle: footer.handleCycle,
@@ -488,7 +502,7 @@ export class RunFooter implements FooterApi {
       status: typeof next.status === "string" ? next.status : prev.status,
       queue: typeof next.queue === "number" ? Math.max(0, next.queue) : prev.queue,
       model: typeof next.model === "string" ? next.model : prev.model,
-      duration: typeof next.duration === "string" ? next.duration : prev.duration,
+      timing: typeof next.timing === "string" ? next.timing : prev.timing,
       usage: typeof next.usage === "string" ? next.usage : prev.usage,
       first: typeof next.first === "boolean" ? next.first : prev.first,
       interrupt:
@@ -708,13 +722,15 @@ export class RunFooter implements FooterApi {
                 ? 1 + MODEL_ROWS
                 : this.promptRoute.type === "variant"
                   ? 1 + VARIANT_ROWS
-                  : this.promptRoute.type === "queued-menu"
-                    ? 1 + this.subagentMenuRows
-                    : this.promptRoute.type === "subagent-menu"
+                  : this.promptRoute.type === "permission-mode"
+                    ? 1 + COMMAND_ROWS
+                    : this.promptRoute.type === "queued-menu"
                       ? 1 + this.subagentMenuRows
-                      : this.promptRoute.type === "subagent"
-                        ? this.base + SUBAGENT_INSPECTOR_ROWS
-                        : this.base + Math.max(TEXTAREA_MIN_ROWS, Math.min(PROMPT_MAX_ROWS, this.rows))
+                      : this.promptRoute.type === "subagent-menu"
+                        ? 1 + this.subagentMenuRows
+                        : this.promptRoute.type === "subagent"
+                          ? this.base + SUBAGENT_INSPECTOR_ROWS
+                          : this.base + Math.max(TEXTAREA_MIN_ROWS, Math.min(PROMPT_MAX_ROWS, this.rows))
 
     if (height !== this.renderer.footerHeight) {
       this.renderer.footerHeight = height
@@ -773,6 +789,22 @@ export class RunFooter implements FooterApi {
     }
 
     await this.options.onPermissionReply(input)
+  }
+
+  private handlePermissionModeSelect = (mode: RunPermissionMode): void => {
+    if (this.isClosed) {
+      return
+    }
+
+    const enabled = mode === "auto"
+    if (this.autoPermission() === enabled) {
+      this.setNotice(enabled ? "AUTO mode already enabled" : "Approve mode already enabled")
+      return
+    }
+
+    this.setAutoPermission(enabled)
+    this.options.onPermissionModeSelect?.(mode)
+    this.setNotice(enabled ? "AUTO mode enabled" : "Approve mode enabled")
   }
 
   private handleQuestionReply = async (input: QuestionReply): Promise<void> => {

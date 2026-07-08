@@ -64,6 +64,58 @@ const withHome = <A, E, R>(home: string, self: Effect.Effect<A, E, R>) =>
   )
 
 describe("skill", () => {
+  it.live("registers built-in customize-opencode and interface skills", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const builtins = (yield* skill.all()).filter((item) => item.location === "<built-in>")
+          const names = builtins.map((item) => item.name).toSorted()
+          const interfaceSkill = yield* skill.require("interface")
+
+          expect(names).toContain("customize-opencode")
+          expect(names).toContain("interface")
+          expect(interfaceSkill.description).toContain("contract-first interfaces")
+          expect(interfaceSkill.description).toContain("ownership boundaries")
+          expect(interfaceSkill.description).toContain("review focus")
+          expect(interfaceSkill.content).toContain("# Interface Skill")
+          expect(interfaceSkill.content).toContain("multiple implementation agents")
+          expect(interfaceSkill.content).toContain("Prepare the ground before coders edit files")
+          expect(interfaceSkill.content).toContain("contract-first interfaces")
+          expect(interfaceSkill.content).toContain("interface contracts")
+          expect(interfaceSkill.content).toContain("handoff README")
+          expect(interfaceSkill.content).toContain("work-package map")
+          expect(interfaceSkill.content).toContain("ownership lanes")
+          expect(interfaceSkill.content).toContain("dependency boundaries")
+          expect(interfaceSkill.content).toContain("ownership boundaries")
+          expect(interfaceSkill.content).toContain("shared objective")
+          expect(interfaceSkill.content).toContain("fan-out/fan-in")
+          expect(interfaceSkill.content).toContain("Interface Contracts")
+          expect(interfaceSkill.content).toContain("Coder Dispatch Prompts")
+          expect(interfaceSkill.content).toContain("Parallel Versus Sequential Guidance")
+          expect(interfaceSkill.content).toContain("Which coder owns the implementation")
+          expect(interfaceSkill.content).toContain("Which other work packages consume it")
+          expect(interfaceSkill.content).toContain("ready-now coder batch")
+          expect(interfaceSkill.content).toContain("Blocked-by-dependency")
+          expect(interfaceSkill.content).toContain("Correctness Criteria")
+          expect(interfaceSkill.content).toContain("Review Focus")
+          expect(interfaceSkill.content).toContain("## Selected Plan")
+          expect(interfaceSkill.content).toContain("## Owned Scope")
+          expect(interfaceSkill.content).toContain("## Avoid / Do Not Edit")
+          expect(interfaceSkill.content).toContain("## Public Interfaces / Contracts")
+          expect(interfaceSkill.content).toContain("## Ownership Lane")
+          expect(interfaceSkill.content).toContain("- Coder task name:")
+          expect(interfaceSkill.content).toContain("- Dependencies:")
+          expect(interfaceSkill.content).toContain("- Can run in parallel with:")
+          expect(interfaceSkill.content).toContain("- Must run after:")
+          expect(interfaceSkill.content).toContain("- Correctness criteria:")
+          expect(interfaceSkill.content).toContain("Blocker protocol")
+          expect(interfaceSkill.content).toContain("orchestrator questions")
+        }),
+      { git: true },
+    ),
+  )
+
   it.effect("formats verbose locations as XML-safe filesystem paths", () =>
     Effect.sync(() => {
       const output = Skill.fmt(

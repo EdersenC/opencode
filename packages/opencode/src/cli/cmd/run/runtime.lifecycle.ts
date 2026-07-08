@@ -26,6 +26,7 @@ import type {
   QuestionReply,
   RunAgent,
   RunInput,
+  RunPermissionMode,
   RunPrompt,
   RunResource,
   RunTuiConfig,
@@ -66,7 +67,9 @@ export type LifecycleInput = {
   variant: string | undefined
   tuiConfig: RunTuiConfig
   backgroundSubagents: boolean
+  autoPermission: boolean
   onPermissionReply: (input: PermissionReply) => void | Promise<void>
+  onPermissionModeSelect?: (mode: RunPermissionMode) => void
   onQuestionReply: (input: QuestionReply) => void | Promise<void>
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycleVariant?: () => CycleResult | void
@@ -245,8 +248,10 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
       keymap,
       tuiConfig: input.tuiConfig,
       backgroundSubagents: input.backgroundSubagents,
+      autoPermission: input.autoPermission,
       diffStyle: input.tuiConfig.diff_style ?? "auto",
       onPermissionReply: input.onPermissionReply,
+      onPermissionModeSelect: input.onPermissionModeSelect,
       onQuestionReply: input.onQuestionReply,
       onQuestionReject: input.onQuestionReject,
       onCycleVariant: input.onCycleVariant,

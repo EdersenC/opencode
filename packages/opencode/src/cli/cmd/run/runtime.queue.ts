@@ -5,7 +5,8 @@
 // an active ordinary turn are exposed for edit/removal until they begin.
 //
 // The queue also handles /exit, /quit, and /new commands, empty-prompt rejection,
-// and tracks per-turn wall-clock duration for the footer status line.
+// and tracks per-turn wall-clock duration for scrollback summaries plus
+// cumulative session timing for the footer status line.
 //
 // Resolves when the footer closes and all in-flight work finishes.
 import * as Locale from "@/util/locale"
@@ -26,6 +27,7 @@ type Deferred<T = void> = {
 export type QueueInput = {
   footer: FooterApi
   initialInput?: string
+  now?: () => number
   trace?: Trace
   onSend?: (prompt: RunPrompt) => void
   onNewSession?: () => void | Promise<void>
@@ -57,6 +59,7 @@ function defer<T = void>(): Deferred<T> {
 // Ordinary prompts submitted during an ordinary active turn remain local and
 // are exposed by the footer for edit/removal until their turn begins.
 export async function runPromptQueue(input: QueueInput): Promise<void> {
+  const now = input.now ?? Date.now
   const stop = defer<{ type: "closed" }>()
   const done = defer()
   const state: State = {
@@ -64,12 +67,88 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
     queued: [],
     closed: input.footer.isClosed,
   }
+  const timing = {
+    sessionStartedAt: now(),
+    workingMs: 0,
+    betweenMs: 0,
+    activeStartedAt: undefined as number | undefined,
+    betweenStartedAt: now(),
+  }
   let draining: Promise<void> | undefined
 
   const emit = (next: FooterEvent, row: Record<string, unknown>) => {
     input.trace?.write("ui.patch", row)
     input.footer.event(next)
   }
+
+  const timingSnapshot = () => {
+    const at = now()
+    const workingMs =
+      timing.activeStartedAt === undefined
+        ? timing.workingMs
+        : timing.workingMs + Math.max(0, at - timing.activeStartedAt)
+    const betweenMs =
+      timing.activeStartedAt === undefined
+        ? timing.betweenMs + Math.max(0, at - timing.betweenStartedAt)
+        : timing.betweenMs
+    return {
+      totalMs: Math.max(0, at - timing.sessionStartedAt),
+      workingMs,
+      betweenMs,
+    }
+  }
+
+  const formatTiming = () => {
+    const snapshot = timingSnapshot()
+    return [
+      `total ${Locale.duration(snapshot.totalMs)}`,
+      `work ${Locale.duration(snapshot.workingMs)}`,
+      `between ${Locale.duration(snapshot.betweenMs)}`,
+    ].join(" · ")
+  }
+
+  const syncTiming = () => {
+    const snapshot = timingSnapshot()
+    emit(
+      {
+        type: "session.timing",
+        timing: formatTiming(),
+      },
+      snapshot,
+    )
+  }
+
+  const resetTiming = () => {
+    const at = now()
+    timing.sessionStartedAt = at
+    timing.workingMs = 0
+    timing.betweenMs = 0
+    timing.activeStartedAt = undefined
+    timing.betweenStartedAt = at
+    syncTiming()
+  }
+
+  const startWork = () => {
+    const at = now()
+    if (timing.activeStartedAt !== undefined) return at
+    timing.betweenMs += Math.max(0, at - timing.betweenStartedAt)
+    timing.activeStartedAt = at
+    syncTiming()
+    return at
+  }
+
+  const finishWork = () => {
+    const at = now()
+    if (timing.activeStartedAt === undefined) return at
+    timing.workingMs += Math.max(0, at - timing.activeStartedAt)
+    timing.activeStartedAt = undefined
+    timing.betweenStartedAt = at
+    syncTiming()
+    return at
+  }
+
+  const timingInterval = setInterval(syncTiming, 1000)
+  syncTiming()
 
   const syncQueue = () => {
     const queue = state.queue.length
@@ -102,6 +181,7 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
       return
     }
 
+    syncTiming()
     state.closed = true
     state.queue.length = 0
     state.queued.length = 0
@@ -159,6 +239,7 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
               },
             )
             await input.onNewSession()
+            resetTiming()
             continue
           }
 
@@ -182,7 +263,7 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
               queue: state.queue.length,
             },
           )
-          const start = Date.now()
+          const start = startWork()
           const ctrl = new AbortController()
           state.ctrl = ctrl
 
@@ -229,7 +310,8 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
             }
 
             if (sent.mode !== "shell") {
-              const duration = Locale.duration(Math.max(0, Date.now() - start))
+              const completed = finishWork()
+              const duration = Locale.duration(Math.max(0, completed - start))
               emit(
                 {
                   type: "turn.duration",
@@ -239,6 +321,8 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
                   duration,
                 },
               )
+            } else {
+              finishWork()
             }
             state.active = undefined
           }
@@ -340,6 +424,7 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
     finish()
     await done.promise
   } finally {
+    clearInterval(timingInterval)
     offPrompt()
     offClose()
     offRemoveQueued()

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { OpencodeClient } from "@opencode-ai/sdk/v2"
 import { runInteractiveMode } from "@/cli/cmd/run/runtime"
+import type { LifecycleInput } from "@/cli/cmd/run/runtime.lifecycle"
 import type { FooterApi, RunProvider } from "@/cli/cmd/run/types"
 
 type SessionMessage = NonNullable<Awaited<ReturnType<OpencodeClient["session"]["messages"]>>["data"]>[number]
@@ -63,6 +64,7 @@ const provider: RunProvider = {
 }
 
 const transportProviders: RunProvider[][] = []
+const lifecycleInputs: LifecycleInput[] = []
 
 function defer<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -133,6 +135,7 @@ function footer(): FooterApi {
 afterEach(() => {
   mock.restore()
   transportProviders.length = 0
+  lifecycleInputs.length = 0
 })
 
 describe("run interactive runtime", () => {
@@ -198,15 +201,19 @@ describe("run interactive runtime", () => {
         files: [],
         thinking: true,
         backgroundSubagents: false,
+        autoPermission: true,
       },
       {
-        createRuntimeLifecycle: async () => ({
-          footer: footer(),
-          onResize: () => () => {},
-          refreshTheme: () => {},
-          resetForReplay: () => Promise.resolve(),
-          close: () => Promise.resolve(),
-        }),
+        createRuntimeLifecycle: async (input) => {
+          lifecycleInputs.push(input)
+          return {
+            footer: footer(),
+            onResize: () => () => {},
+            refreshTheme: () => {},
+            resetForReplay: () => Promise.resolve(),
+            close: () => Promise.resolve(),
+          }
+        },
         streamTransport: Promise.resolve({
           createSessionTransport: async (input: { providers?: () => RunProvider[]; footer: FooterApi }) => {
             transportProviders.push(input.providers?.() ?? [])
@@ -233,6 +240,7 @@ describe("run interactive runtime", () => {
 
     await task
 
+    expect(lifecycleInputs[0]?.autoPermission).toBe(true)
     expect(transportProviders).toEqual([[provider]])
   })
 })

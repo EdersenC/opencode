@@ -33,6 +33,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
+import { withMode } from "@/permission/auto"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
@@ -57,8 +58,7 @@ import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
 
-// @ts-ignore
-globalThis.AI_SDK_LOG_WARNINGS = false
+;(globalThis as typeof globalThis & { AI_SDK_LOG_WARNINGS?: boolean }).AI_SDK_LOG_WARNINGS = false
 
 const decodeMessageInfo = Schema.decodeUnknownExit(SessionV1.Info)
 const decodeMessagePart = Schema.decodeUnknownExit(SessionV1.Part)
@@ -320,6 +320,7 @@ const layer = Layer.effect(
       }
 
       let error: Error | undefined
+      const cfg = yield* config.get()
       const taskAbort = new AbortController()
       const result = yield* taskTool
         .execute(taskArgs, {
@@ -330,7 +331,7 @@ const layer = Layer.effect(
           callID: part.callID,
           extra: { bypassAgentCheck: true, promptOps },
           messages: msgs,
-          metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
+          metadata: (val: Parameters<Tool.Context["metadata"]>[0]) =>
             Effect.gen(function* () {
               part = yield* sessions.updatePart({
                 ...part,
@@ -338,11 +339,12 @@ const layer = Layer.effect(
                 state: { ...part.state, ...val },
               } satisfies SessionV1.ToolPart)
             }),
-          ask: (req: any) =>
+          ask: (req: Parameters<Tool.Context["ask"]>[0]) =>
             permission
               .ask({
                 ...req,
                 sessionID,
+                metadata: withMode(req.metadata, cfg.permission_mode),
                 ruleset: Permission.merge(taskAgent.permission, session.permission ?? []),
               })
               .pipe(Effect.orDie),
@@ -1235,6 +1237,7 @@ const layer = Layer.effect(
               Effect.provideService(Plugin.Service, plugin),
               Effect.provideService(Permission.Service, permission),
               Effect.provideService(ToolRegistry.Service, registry),
+              Effect.provideService(Config.Service, config),
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
             )
@@ -1562,7 +1565,7 @@ export type CommandInput = Schema.Schema.Type<typeof CommandInput>
 
 /** @internal Exported for testing */
 export function createStructuredOutputTool(input: {
-  schema: Record<string, any>
+  schema: Record<string, unknown>
   onSuccess: (output: unknown) => void
 }): AITool {
   // Remove $schema property if present (not needed for tool input)

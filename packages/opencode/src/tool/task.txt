@@ -1,4 +1,4 @@
-Launch a new agent to handle complex, multistep tasks autonomously.
+Launch a new agent to handle complex, multistep work inside a clear scope.
 
 When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
 
@@ -10,10 +10,17 @@ When NOT to use the Task tool:
 
 
 Usage notes:
-1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
+1. Launch multiple agents concurrently whenever safe, to maximize useful parallel work; to do that, use a single message with multiple tool uses
+   - For unrelated independent tasks, multiple direct task calls are fine.
+   - For related coder slices that share one implementation bucket, use one group tool call with multiple nested task calls. The group returns one combined result and starts the nested tasks concurrently.
 2. Once you have delegated work to an agent, do not duplicate that work yourself. Continue with non-overlapping tasks, or wait for the result. For background tasks, you will be notified automatically when the result is ready.
-3. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result. The output includes a task_id you can reuse later to continue the same subagent session.
-4. Each agent invocation starts with a fresh context unless you provide task_id to resume the same subagent session (which continues with its previous messages and tool outputs). When starting fresh, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
-5. The agent's outputs should generally be trusted
+3. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, send a concise summary that synthesizes the useful findings or changes. The output includes a task_id you can reuse later to continue the same subagent session.
+4. Each agent invocation starts with a fresh context unless you provide task_id to resume the same subagent session, which continues with its previous messages and tool outputs. When starting fresh, provide enough context for autonomous work and specify exactly what information the agent should return in its final and only message.
+5. The agent's outputs should generally be trusted, then reviewed against the task scope, handoff files, and repository state before you claim completion.
 6. Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent. Tell it how to verify its work if possible (e.g., relevant test commands).
-7. If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.
+7. If the agent description says to use it proactively, use it when the task matches. Use direct tools for small, obvious, single-file work.
+8. Use handoff_files for handoff READMEs, interface contracts, work-package maps, or other context files the subagent should read first. Prefer passing file paths in handoff_files over pasting large handoff documents into the prompt. Keep the prompt concise: goal, scope, constraints, expected output, and verification.
+9. If you are coordinating related coder work and more than one coder slice can start from the same contracts or handoff_files, use group with multiple nested task calls instead of issuing direct task calls one by one.
+10. Direct task is best for one isolated subagent, a true dependency step, background work, or resuming a task_id. For a post-foundation implementation layer, put engine, CLI, tests, docs, adapters, or UI in the same group when they can work from the same contracts.
+11. Do not announce a parallel coder phase and then call only one coder task when other ready coder slices exist. Parallel coder work means one group call with multiple nested task calls, or multiple independent group calls in the same assistant message.
+12. Delegate with clear scope: tell the subagent the common goal, owned files, files to avoid, interface contracts, expected output, verification, and escalation path.

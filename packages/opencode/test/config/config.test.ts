@@ -1329,6 +1329,12 @@ test("config parser preserves permission order while rejecting unknown top-level
   }
 })
 
+test("config parser accepts permission_mode auto", () => {
+  const config = ConfigParse.schema(ConfigV1.Info, { permission_mode: "auto" }, "test")
+  expect(config.permission_mode).toBe("auto")
+  expect(() => ConfigParse.schema(ConfigV1.Info, { permission_mode: "yolo" }, "test")).toThrow()
+})
+
 // MCP config merging tests
 
 it.instance("project config can override MCP server enabled status", () =>

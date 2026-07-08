@@ -14,6 +14,9 @@ import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import { createCoderPrompt } from "./prompt/coder"
+import { createOrchestratePrompt } from "./prompt/orchestrate"
+import { createPlannerPrompt } from "./prompt/planner"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
@@ -60,6 +63,11 @@ const GeneratedAgent = Schema.Struct({
   whenToUse: Schema.String,
   systemPrompt: Schema.String,
 })
+
+// TODO: Thread provider/model metadata into prompt factories when native agent prompts are compiled per session.
+const PROMPT_ORCHESTRATE = createOrchestratePrompt({ agent: "orchestrate" })
+const PROMPT_CODER = createCoderPrompt({ agent: "coder" })
+const PROMPT_PLANNER = createPlannerPrompt({ agent: "planner" })
 
 export interface Interface {
   readonly get: (agent: string) => Effect.Effect<Info>
@@ -145,8 +153,21 @@ const layer = Layer.effect(
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
-                question: "allow",
-                plan_enter: "allow",
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                group: "allow",
+                task: "allow",
+                bash: "ask",
+                grep: "allow",
+                glob: "allow",
+                edit: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
               }),
               user,
             ),
@@ -168,15 +189,128 @@ const layer = Layer.effect(
                 external_directory: {
                   [path.join(Global.Path.data, "plans", "*")]: "allow",
                 },
+                bash: "deny",
                 edit: {
                   "*": "deny",
                   [path.join(".opencode", "plans", "*.md")]: "allow",
                   [path.relative(ctx.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]: "allow",
                 },
+                write: "deny",
+                apply_patch: "deny",
+                todowrite: "deny",
               }),
               user,
             ),
             mode: "primary",
+            native: true,
+          },
+          // TODO: Promote planner fanout into a configurable multi-plan workflow if the prompt-driven pattern stabilizes.
+          orchestrate: {
+            name: "orchestrate",
+            description: "Orchestrate mode. Decomposes large goals into grouped parallel subagent work.",
+            prompt: PROMPT_ORCHESTRATE,
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                question: "allow",
+                group: "allow",
+                skill: {
+                  "*": "deny",
+                  interface: "allow",
+                },
+                task: {
+                  "*": "allow",
+                  general: "allow",
+                  explore: "allow",
+                  scout: "allow",
+                  planner: "allow",
+                  coder: "allow",
+                },
+                grep: "allow",
+                glob: "allow",
+                bash: "ask",
+                edit: "allow",
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            native: true,
+          },
+          coder: {
+            name: "coder",
+            description: "Implementation subagent for scoped, high-quality coding work.",
+            prompt: PROMPT_CODER,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                doom_loop: "ask",
+                external_directory: readonlyExternalDirectory,
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+                list: "allow",
+                glob: "allow",
+                grep: "allow",
+                edit: "allow",
+                bash: "ask",
+                question: "deny",
+                task: "deny",
+                group: "deny",
+                todowrite: "deny",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          planner: {
+            name: "planner",
+            description:
+              "Creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel to compare approaches.",
+            prompt: PROMPT_PLANNER,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                external_directory: readonlyExternalDirectory,
+                read: {
+                  "*": "allow",
+                  "*.env": "ask",
+                  "*.env.*": "ask",
+                  "*.env.example": "allow",
+                },
+                list: "allow",
+                glob: "allow",
+                grep: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                bash: "deny",
+                edit: "deny",
+                write: "deny",
+                apply_patch: "deny",
+                task: "deny",
+                group: "deny",
+                todowrite: "deny",
+              }),
+              user,
+            ),
+            options: {},
+            mode: "subagent",
             native: true,
           },
           general: {

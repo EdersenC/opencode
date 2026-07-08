@@ -6,7 +6,7 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
-import { cliIt } from "../../lib/cli-process"
+import { cliIt, testDeepSeekModelID } from "../../lib/cli-process"
 
 describe("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
@@ -19,6 +19,51 @@ describe("opencode run (non-interactive subprocess)", () => {
         const result = yield* opencode.run("say hi")
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("hello from the test llm\n")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "runs with a DeepSeek V4 Flash Free mock model",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("deepseek mock ok")
+
+        const result = yield* opencode.run("say hi with deepseek", { model: testDeepSeekModelID })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("deepseek mock ok\n")
+        expect((yield* llm.inputs).map((input) => input.model)).toContain("deepseek-v4-flash-free")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "runs orchestrate from the CLI with a DeepSeek V4 Flash Free mock model",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.text("orchestrate deepseek ok")
+
+        const result = yield* opencode.run("coordinate a small refactor", {
+          agent: "orchestrate",
+          model: testDeepSeekModelID,
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("orchestrate deepseek ok\n")
+
+        const request = (yield* llm.inputs).find(
+          (input) =>
+            input.model === "deepseek-v4-flash-free" &&
+            JSON.stringify(input).includes("You are the Orchestrate agent"),
+        )
+        if (!request) throw new Error("orchestrate DeepSeek request not captured")
+
+        const body = JSON.stringify(request)
+        expect(body).toContain("multi-plan-generation")
+        expect(body).toContain("subagent_type")
+        expect(body).toContain("planner")
+        expect(toolNames(request)).toEqual(expect.arrayContaining(["bash", "group", "task"]))
       }),
     60_000,
   )
@@ -43,6 +88,88 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.stdout).toBe("before tool\nafter tool\n")
       }),
     60_000,
+  )
+
+  cliIt.concurrent(
+    "--permission-mode auto auto-approves project-local bash",
+    ({ home, llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.push(
+          reply().tool("bash", {
+            command: "printf auto-mode > auto-mode-marker",
+            description: "Write deterministic project-local output",
+          }),
+        )
+        yield* llm.text("auto done")
+
+        const result = yield* opencode.run("use auto mode", {
+          extraArgs: ["--permission-mode", "auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("auto done\n")
+        expect(result.stderr).not.toContain("permission requested")
+        expect(yield* Effect.promise(() => Bun.file(`${home}/auto-mode-marker`).text())).toBe("auto-mode")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "--auto aliases auto permission mode",
+    ({ home, llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.push(
+          reply().tool("bash", {
+            command: "printf auto-alias > auto-alias-marker",
+            description: "Write deterministic project-local output",
+          }),
+        )
+        yield* llm.text("alias done")
+
+        const result = yield* opencode.run("use auto alias", {
+          extraArgs: ["--auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stdout).toBe("alias done\n")
+        expect(result.stderr).not.toContain("permission requested")
+        expect(yield* Effect.promise(() => Bun.file(`${home}/auto-alias-marker`).text())).toBe("auto-alias")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "--permission-mode auto still asks for package exec shortcuts",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.tool("bash", {
+          command: "npm exec --version",
+          description: "Run a package-exec shortcut",
+        })
+        yield* llm.text("package exec should not be auto-approved")
+
+        const result = yield* opencode.run("use an unsafe auto command", {
+          extraArgs: ["--permission-mode", "auto"],
+        })
+
+        opencode.expectExit(result, 0)
+        expect(result.stderr).toContain("permission requested: bash")
+        expect(result.stdout).toBe("")
+      }),
+    60_000,
+  )
+
+  cliIt.concurrent(
+    "rejects invalid permission mode values",
+    ({ opencode }) =>
+      Effect.gen(function* () {
+        const result = yield* opencode.spawn(["run", "--permission-mode", "yolo", "--model", "test/test-model", "hi"])
+
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stderr).toContain("permission-mode")
+        expect(result.stderr).toContain('choices: "ask", "auto"')
+      }),
+    30_000,
   )
 
   cliIt.concurrent(
@@ -223,7 +350,10 @@ describe("opencode run (non-interactive subprocess)", () => {
           }),
         )
         yield* llm.fail("provider failed")
-        const result = yield* opencode.run("fail after output", { format: "json" })
+        const result = yield* opencode.run("fail after output", {
+          format: "json",
+          extraArgs: ["--dangerously-skip-permissions"],
+        })
 
         const events = opencode.parseJsonEvents(result.stdout)
         expect(result.exitCode).toBe(0)
@@ -236,7 +366,15 @@ describe("opencode run (non-interactive subprocess)", () => {
           "step_finish",
         ])
         expect(events[1]?.part).toEqual(expect.objectContaining({ type: "text", text: "partial json" }))
+        expect(events[2]?.part).toEqual(
+          expect.objectContaining({
+            type: "tool",
+            tool: "bash",
+            state: expect.objectContaining({ status: "completed" }),
+          }),
+        )
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "unknown" }))
+        expect(events.some((event) => event.type === "error")).toBe(false)
       }),
     60_000,
   )
@@ -329,3 +467,19 @@ describe("opencode run (non-interactive subprocess)", () => {
     30_000,
   )
 })
+
+function toolNames(input: Record<string, unknown>) {
+  const tools = Array.isArray(input.tools) ? input.tools : []
+  return tools
+    .map((tool) => {
+      if (!tool || typeof tool !== "object") return
+      const record = tool as Record<string, unknown>
+      const fn = record.function
+      if (fn && typeof fn === "object") {
+        const name = (fn as Record<string, unknown>).name
+        if (typeof name === "string") return name
+      }
+      if (typeof record.name === "string") return record.name
+    })
+    .filter((name): name is string => typeof name === "string")
+}

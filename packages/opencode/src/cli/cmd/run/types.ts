@@ -69,6 +69,7 @@ export type RunInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   demo?: boolean
 }
 
@@ -85,7 +86,7 @@ export type FooterState = {
   status: string
   queue: number
   model: string
-  duration: string
+  timing: string
   usage: string
   first: boolean
   interrupt: number
@@ -184,6 +185,9 @@ export type FooterPromptRoute =
   | { type: "skill" }
   | { type: "model" }
   | { type: "variant" }
+  | { type: "permission-mode" }
+
+export type RunPermissionMode = "ask" | "auto"
 
 export type FooterSubagentTab = {
   sessionID: string
@@ -266,6 +270,10 @@ export type FooterEvent =
   | {
       type: "turn.duration"
       duration: string
+    }
+  | {
+      type: "session.timing"
+      timing: string
     }
   | {
       type: "stream.patch"

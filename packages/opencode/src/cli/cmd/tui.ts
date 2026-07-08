@@ -107,8 +107,13 @@ export const TuiThreadCommand = cmd({
       })
       .option("auto", {
         type: "boolean",
-        describe: "auto-approve permissions that are not explicitly denied (dangerous!)",
+        describe: "auto-approve safe project-local bash permissions",
         default: false,
+      })
+      .option("permission-mode", {
+        type: "string",
+        choices: ["ask", "auto"],
+        describe: "permission mode to use",
       })
       .option("yolo", {
         type: "boolean",
@@ -287,7 +292,11 @@ export const TuiThreadCommand = cmd({
               model: args.model,
               prompt,
               fork: args.fork,
-              auto: args.auto || args.yolo || args["dangerously-skip-permissions"],
+              auto:
+                args["permission-mode"] === "auto" ||
+                args.auto ||
+                args.yolo ||
+                args["dangerously-skip-permissions"],
             },
           }),
         )

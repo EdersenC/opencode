@@ -21,21 +21,32 @@ Each permission rule resolves to one of:
 
 ## Auto mode
 
-Start OpenCode with `--auto` to automatically approve permission requests that are not explicitly denied.
+Start OpenCode with `--auto` to automatically approve safe project-local bash permission requests that are not explicitly denied.
 
 ```bash
 opencode --auto
 ```
 
-You can also use auto mode with [`opencode run`](/docs/cli#run).
+You can also use `--permission-mode auto`, including with [`opencode run`](/docs/cli#run).
 
 ```bash
-opencode run --auto "Refactor this module"
+opencode run --permission-mode auto "Refactor this module"
 ```
 
-Explicit `"deny"` rules are still enforced. Auto mode only changes requests that would otherwise ask for approval.
+Explicit `"deny"` rules are still enforced. Auto mode only changes safe project-local bash requests that would otherwise ask for approval. Requests that touch paths outside the project directory, execute downloaded packages, broadly delete the workspace, run deployment/cloud/container/system commands, push/publish, or pipe remote downloads into a shell still ask. Clearly destructive commands such as deleting root or home directories are denied.
 
-In the TUI, open the command palette and select **Enable auto-approve permissions** or **Disable auto-approve permissions** to change modes. When auto mode is active, the prompt displays a muted `auto` indicator next to the current agent.
+Auto mode follows the active session, including subagents launched through `task` and `group` by agents such as `orchestrate`. Agent-level deny rules still win, so read-only agents such as `plan` and planner-style subagents do not gain mutation access just because auto mode is active.
+
+You can make auto mode persistent in config:
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission_mode": "auto"
+}
+```
+
+In direct interactive `opencode run`, type `/permissions` or open the command palette and select **Permissions** to switch between **Approve** and **Auto**. The footer statusline shows `AUTO` while auto mode is active. In the full TUI, use `/permissions` from slash autocomplete or the **Permissions** command to toggle the current session between Approve and Auto.
 
 ---
 
@@ -154,6 +165,7 @@ OpenCode permissions are keyed by tool name, plus a couple of safety guards:
 - `glob` — file globbing (matches the glob pattern)
 - `grep` — content search (matches the regex pattern)
 - `bash` — running shell commands (matches parsed commands like `git status --porcelain`)
+- `group` — launching grouped subagent task calls (matches the group name)
 - `task` — launching subagents (matches the subagent type)
 - `skill` — loading a skill (matches the skill name)
 - `lsp` — running LSP queries (currently non-granular)

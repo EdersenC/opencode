@@ -22,6 +22,7 @@ import type { ShellTool as BashTool } from "@/tool/shell"
 import type { EditTool } from "@/tool/edit"
 import type { GlobTool } from "@/tool/glob"
 import type { GrepTool } from "@/tool/grep"
+import type { GroupTool } from "@/tool/group"
 import type { InvalidTool } from "@/tool/invalid"
 import type { LspTool } from "@/tool/lsp"
 import type { PlanExitTool } from "@/tool/plan"
@@ -98,6 +99,7 @@ type ToolDefs = {
   edit: typeof EditTool
   apply_patch: typeof ApplyPatchTool
   batch: Tool.Info
+  group: typeof GroupTool
   task: typeof TaskTool
   todowrite: typeof TodoWriteTool
   question: typeof QuestionTool
@@ -371,6 +373,41 @@ function runTask(p: ToolProps<typeof TaskTool>): ToolInline {
     icon,
     title: desc || `${kind} Task`,
     description: desc ? `${kind} Agent` : undefined,
+  }
+}
+
+function runGroup(p: ToolProps<typeof GroupTool>): ToolInline {
+  const group = dict(p.metadata.group)
+  const state = text(group.state) || p.frame.status
+  const failed = num(group.failedCount) ?? 0
+  const aborted = num(group.abortedCount) ?? 0
+  const blocked = num(group.blockedCount) ?? 0
+  const total = num(group.callCount) ?? list<unknown>(p.input.calls).length
+  const icon =
+    state === "failed" || state === "aborted" || p.frame.status === "error"
+      ? "✗"
+      : failed + aborted > 0
+        ? "!"
+        : blocked > 0
+          ? "?"
+        : state === "running"
+          ? "•"
+          : "✓"
+  const description =
+    total > 0
+      ? [
+          `${total} call${total === 1 ? "" : "s"}`,
+          failed > 0 ? `${failed} failed` : "",
+          aborted > 0 ? `${aborted} aborted` : "",
+          blocked > 0 ? `${blocked} blocked` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : undefined
+  return {
+    icon,
+    title: `Group: ${p.input.name || text(group.name) || "task group"}`,
+    ...(description && { description }),
   }
 }
 
@@ -788,6 +825,41 @@ function scrollTaskFinal(p: ToolProps<typeof TaskTool>): string {
   return `# ${kind} Task\n${row}`
 }
 
+function scrollGroupStart(p: ToolProps<typeof GroupTool>): string {
+  const total = list<unknown>(p.input.calls).length
+  return [
+    `# Group: ${p.input.name || "task group"}`,
+    total > 0 ? `Starting ${total} call${total === 1 ? "" : "s"}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
+function scrollGroupFinal(p: ToolProps<typeof GroupTool>): string {
+  if (p.frame.status === "error") {
+    return fail(p.frame)
+  }
+
+  const group = dict(p.metadata.group)
+  const name = p.input.name || text(group.name) || "task group"
+  const completed = num(group.completedCount) ?? 0
+  const failed = num(group.failedCount) ?? 0
+  const aborted = num(group.abortedCount) ?? 0
+  const blocked = num(group.blockedCount) ?? 0
+  const total = num(group.callCount) ?? list<unknown>(p.input.calls).length
+  return [
+    `# Group: ${name}`,
+    [
+      `Completed ${completed} of ${total} calls.`,
+      `Failed ${failed} of ${total} calls.`,
+      aborted > 0 ? `Aborted ${aborted} of ${total} calls.` : "",
+      blocked > 0 ? `Blocked ${blocked} of ${total} calls.` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  ].join("\n")
+}
+
 function scrollTodoStart(_: ToolProps<typeof TodoWriteTool>): string {
   return ""
 }
@@ -984,6 +1056,16 @@ function permTask(p: ToolPermissionProps<typeof TaskTool>): ToolPermissionInfo {
   }
 }
 
+function permGroup(p: ToolPermissionProps<typeof GroupTool>): ToolPermissionInfo {
+  const name = p.input.name || p.patterns[0] || "task group"
+  const desc = p.input.description
+  return {
+    icon: "#",
+    title: `Group: ${name}`,
+    lines: desc ? [`◉ ${desc}`] : [],
+  }
+}
+
 function permWebfetch(p: ToolPermissionProps<typeof WebFetchTool>): ToolPermissionInfo {
   const url = p.input.url || ""
   return {
@@ -1104,6 +1186,18 @@ const TOOL_RULES = {
       final: scrollTaskFinal,
     },
     permission: permTask,
+  },
+  group: {
+    view: {
+      output: false,
+      final: true,
+    },
+    run: runGroup,
+    scroll: {
+      start: scrollGroupStart,
+      final: scrollGroupFinal,
+    },
+    permission: permGroup,
   },
   todowrite: {
     view: {

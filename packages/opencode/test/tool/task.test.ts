@@ -16,7 +16,7 @@ import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
 
-import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
+import { renderPrompt, TaskTool, type TaskPromptOps } from "../../src/tool/task"
 import { Truncate } from "@/tool/truncate"
 import { ToolRegistry } from "@/tool/registry"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -139,6 +139,24 @@ function reply(input: SessionPrompt.PromptInput, text: string): SessionV1.WithPa
 }
 
 describe("tool.task", () => {
+  it.effect("renders handoff files before the task prompt", () =>
+    Effect.sync(() => {
+      const prompt = renderPrompt({
+        handoff_files: [
+          " docs/orchestration/feature/core/README.md ",
+          "docs/orchestration/feature/contracts.md",
+          "docs/orchestration/feature/contracts.md",
+        ],
+        prompt: "Implement the core slice.",
+      })
+
+      expect(prompt).toContain("<handoff_files>")
+      expect(prompt).toContain("- docs/orchestration/feature/core/README.md")
+      expect(prompt.split("docs/orchestration/feature/contracts.md")).toHaveLength(2)
+      expect(prompt).toContain("<task_prompt>\nImplement the core slice.\n</task_prompt>")
+    }),
+  )
+
   it.instance(
     "description sorts subagents by name and is stable across calls",
     () =>
@@ -156,14 +174,22 @@ describe("tool.task", () => {
         expect(first).toBe(second)
 
         const alpha = first.indexOf("- alpha: Alpha agent")
+        const coder = first.indexOf("- coder:")
         const explore = first.indexOf("- explore:")
         const general = first.indexOf("- general:")
+        const planner = first.indexOf("- planner:")
         const zebra = first.indexOf("- zebra: Zebra agent")
 
         expect(alpha).toBeGreaterThan(-1)
-        expect(explore).toBeGreaterThan(alpha)
+        expect(coder).toBeGreaterThan(alpha)
+        expect(explore).toBeGreaterThan(coder)
         expect(general).toBeGreaterThan(explore)
-        expect(zebra).toBeGreaterThan(general)
+        expect(planner).toBeGreaterThan(general)
+        expect(zebra).toBeGreaterThan(planner)
+        expect(first).toContain("related coder slices that share one implementation bucket")
+        expect(first).toContain("use group with multiple nested task calls")
+        expect(first).toContain("For a post-foundation implementation layer")
+        expect(first).toContain("Do not announce a parallel coder phase")
       }),
     {
       config: {
@@ -252,6 +278,51 @@ describe("tool.task", () => {
       expect(result.output).toContain(`<task id="${child.id}" state="completed">`)
       expect(seen?.sessionID).toBe(child.id)
       expect(seen?.variant).toBe("xhigh")
+    }),
+  )
+
+  it.instance("execute injects handoff files into the child prompt and metadata", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let seen: SessionPrompt.PromptInput | undefined
+      const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+      const result = yield* def.execute(
+        {
+          description: "implement core",
+          prompt: "Implement the core slice.",
+          subagent_type: "coder",
+          handoff_files: [
+            "docs/orchestration/feature/work-packages.md",
+            "docs/orchestration/feature/contracts.md",
+            "docs/orchestration/feature/core/README.md",
+          ],
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "orchestrate",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      const text = seen?.parts.find((part) => part.type === "text")?.text ?? ""
+      expect(text).toContain("<handoff_files>")
+      expect(text).toContain("- docs/orchestration/feature/work-packages.md")
+      expect(text).toContain("- docs/orchestration/feature/contracts.md")
+      expect(text).toContain("- docs/orchestration/feature/core/README.md")
+      expect(text).toContain("<task_prompt>\nImplement the core slice.\n</task_prompt>")
+      expect(result.metadata.handoffFiles).toEqual([
+        "docs/orchestration/feature/work-packages.md",
+        "docs/orchestration/feature/contracts.md",
+        "docs/orchestration/feature/core/README.md",
+      ])
     }),
   )
 

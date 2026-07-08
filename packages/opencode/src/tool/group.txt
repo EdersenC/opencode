@@ -1,0 +1,125 @@
+# Group Tool
+
+Use `group` to cluster related work into one coordinated bucket.
+
+A group is a cohort of nested task calls that share a common goal. Use it when several subagents can work in parallel lanes and return one grouped result after the whole cohort finishes.
+
+`group` is a scatter-gather tool for aggregation and synthesis. It is for related work with one shared objective, not arbitrary batching. Treat each group as a workstream: one bucket, one objective, one completion barrier, one grouped result.
+
+Think of `group` as fan-out/fan-in:
+1. Fan out related work to several nested task calls.
+2. Let each task work independently inside its assigned ownership lane.
+3. Wait at the group completion barrier.
+4. Fan in the results as one grouped response.
+5. Synthesize the result before deciding the next step.
+
+Use `group` when:
+- multiple subtasks share one objective
+- several agents can work in parallel
+- work can be divided into clear ownership lanes
+- one grouped result is more useful than separate scattered results
+- a planning, implementation, review, or verification bucket is needed
+- independent perspectives should be collected, compared, aggregated, and synthesized
+- a ready batch should move together instead of being split into avoidable waits
+
+Do not use `group` when:
+- one direct tool call or one direct task call is enough
+- the tasks are unrelated
+- the tasks must happen strictly one after another
+- agents would edit the same files without a clear ownership boundary
+- unrelated work would be hidden inside one bucket
+
+Grouping examples:
+- `environment-discovery`: several explore tasks inspect different parts of the repo
+- `multi-plan-generation`: several planner agents produce different plans
+- `interface-contracts`: agents or direct work define handoff docs and shared contracts
+- `implementation-slices`: coder agents implement separate ownership lanes
+- `review-and-verification`: review, test, lint, and integration checks run as one quality gate
+- `targeted-fix-round`: coders fix separate issues found during review
+
+Grouping rules:
+- One group equals one common goal.
+- Use separate groups for separate workstreams.
+- Emit multiple `group` calls in the same message when independent workstreams can run concurrently.
+- Keep each nested task scoped and non-overlapping.
+- Give each task a clear name, description, owned scope, expected result, and blocker protocol.
+- Include every ready sibling task that can safely work from the same contracts, handoff files, stubs, fixtures, schemas, or public behavior.
+- Do not drip-feed ready sibling tasks one at a time when they can run in the same group.
+- Use sequential flow when a later task genuinely needs concrete output from an earlier task and written contracts are not enough.
+- Prefer a wider safe cohort over several narrow calls when ownership lanes are clear.
+- Use `priority: high` for blockers, critical implementation, or validation gates.
+- Use `priority: medium` for normal implementation and review.
+- Use `priority: low` for cleanup, docs, or optional analysis.
+
+v1 constraints:
+- One `group` tool call represents one group.
+- v1 supports nested `task` calls only.
+- Inner task calls run concurrently.
+- Inner background tasks are not supported because group waits for foreground completion.
+- `fail_fast` is accepted for forward compatibility, but v1 returns all settled nested results.
+- If a nested coder task returns `<coder_result state="blocked">`, group preserves that call as blocked in metadata and output. Resolve the blocker, then redispatch only the affected task.
+- For nested coder tasks, prefer `input.handoff_files` for handoff READMEs, interface contracts, work-package maps, and context docs. Keep `input.prompt` focused on task goal, scope, constraints, and expected return format instead of pasting large handoff documents.
+
+Example:
+{
+  "name": "implementation-slices",
+  "description": "Coder agents implement separate ownership lanes for the selected feature plan.",
+  "priority": "high",
+  "calls": [
+    {
+      "tool": "task",
+      "name": "core-domain-coder",
+      "description": "Implement the core domain lane.",
+      "input": {
+        "description": "Core domain implementation",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/feature/work-packages.md",
+          "docs/orchestration/feature/contracts.md",
+          "docs/orchestration/feature/core-domain/README.md"
+        ],
+        "prompt": "Read the handoff README first. Work only in the assigned core-domain scope unless a contract requires otherwise. Implement the public contracts, add focused tests, and return files changed, tests run, risks, and blockers."
+      }
+    },
+    {
+      "tool": "task",
+      "name": "adapter-coder",
+      "description": "Implement the adapter lane.",
+      "input": {
+        "description": "Adapter implementation",
+        "subagent_type": "coder",
+        "handoff_files": [
+          "docs/orchestration/feature/work-packages.md",
+          "docs/orchestration/feature/contracts.md",
+          "docs/orchestration/feature/adapter/README.md"
+        ],
+        "prompt": "Read the handoff README first. Work only in the assigned adapter scope unless a contract requires otherwise. Implement the adapter contracts, add focused tests, and return files changed, tests run, risks, and blockers."
+      }
+    }
+  ]
+}
+
+Example with two independent groups:
+Emit two `group` tool calls in the same message.
+
+Tool call 1:
+{
+  "name": "feature-implementation",
+  "description": "Agents implement feature XYZ.",
+  "priority": "high",
+  "calls": [...]
+}
+
+Tool call 2:
+{
+  "name": "branch-review",
+  "description": "Agents review the branch, merge conflicts, and code quality.",
+  "priority": "medium",
+  "calls": [...]
+}
+
+Completion behavior:
+- Group 1 returns when all implementation subtasks finish.
+- Group 2 returns when all review subtasks finish.
+- Whichever group finishes first is available first.
+- If both complete in the same batch and ordering can be safely controlled, high priority comes before medium priority.

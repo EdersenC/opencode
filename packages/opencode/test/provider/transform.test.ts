@@ -408,6 +408,70 @@ describe("ProviderTransform.options - gpt-5 textVerbosity", () => {
     expect(result.tools.lookup.strict).toBe(false)
   })
 
+  test("request preparation hides tools outside task and CRUD permissions", async () => {
+    const result = await Effect.runPromise(
+      LLMRequestPrep.prepare({
+        user: {
+          id: "msg_user-test",
+          sessionID,
+          role: "user",
+          time: { created: Date.now() },
+          agent: "test",
+          model: { providerID: "opencode", modelID: "test" },
+        } as any,
+        sessionID,
+        model: createGpt5Model("gpt-5.2"),
+        agent: {
+          name: "test",
+          mode: "primary",
+          options: {},
+          permission: [
+            { permission: "*", pattern: "*", action: "deny" },
+            { permission: "group", pattern: "*", action: "allow" },
+            { permission: "task", pattern: "*", action: "allow" },
+            { permission: "read", pattern: "*", action: "allow" },
+            { permission: "edit", pattern: "*", action: "allow" },
+            { permission: "glob", pattern: "*", action: "allow" },
+            { permission: "grep", pattern: "*", action: "allow" },
+          ],
+        } as any,
+        system: [],
+        messages: [{ role: "user", content: "Hello" }],
+        tools: Object.fromEntries(
+          ["group", "task", "read", "edit", "write", "apply_patch", "bash", "glob", "grep", "skill", "todowrite"].map(
+            (name) => [
+              name,
+              {
+                description: name,
+                inputSchema: jsonSchema({ type: "object", properties: {} }),
+              },
+            ],
+          ),
+        ),
+        provider: { id: "opencode", options: {} } as any,
+        auth: undefined,
+        plugin: {
+          trigger: (_name: string, _input: unknown, output: unknown) => Effect.succeed(output),
+          list: () => Effect.succeed([]),
+          init: () => Effect.void,
+        } as any,
+        flags: { outputTokenMax: 32_000, client: "test" } as any,
+        isWorkflow: false,
+      }),
+    )
+
+    expect(Object.keys(result.tools).sort()).toEqual([
+      "apply_patch",
+      "edit",
+      "glob",
+      "grep",
+      "group",
+      "read",
+      "task",
+      "write",
+    ])
+  })
+
   test("gpt-5.1 should have textVerbosity set to low", () => {
     const model = createGpt5Model("gpt-5.1")
     const result = ProviderTransform.options({ model, sessionID, providerOptions: {} })

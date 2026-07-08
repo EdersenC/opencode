@@ -208,10 +208,13 @@ describe("run runtime queue", () => {
 
   test("shell mode does not emit a turn duration summary", async () => {
     const ui = footer()
+    let current = 1_000
 
     const task = runPromptQueue({
       footer: ui.api,
+      now: () => current,
       run: async () => {
+        current = 2_500
         ui.api.close()
       },
     })
@@ -220,6 +223,10 @@ describe("run runtime queue", () => {
     await task
 
     expect(ui.events.some((event) => event.type === "turn.duration")).toBe(false)
+    expect(ui.events.findLast((event) => event.type === "session.timing")).toEqual({
+      type: "session.timing",
+      timing: "total 1.5s · work 1.5s · between 0ms",
+    })
   })
 
   test("preserves whitespace for initial input", async () => {
@@ -316,6 +323,57 @@ describe("run runtime queue", () => {
     await task
 
     expect(seen).toEqual(["one", "two"])
+  })
+
+  test("tracks total session, working, and between-interaction time", async () => {
+    const ui = footer()
+    const seen: string[] = []
+    let current = 1_000
+    let wakeFirst: (() => void) | undefined
+    let finishSecond: (() => void) | undefined
+    const firstGate = new Promise<void>((resolve) => {
+      wakeFirst = resolve
+    })
+    const secondDone = new Promise<void>((resolve) => {
+      finishSecond = resolve
+    })
+
+    const task = runPromptQueue({
+      footer: ui.api,
+      now: () => current,
+      run: async (input) => {
+        seen.push(input.text)
+        if (input.text === "one") {
+          await firstGate
+          current = 4_500
+          return
+        }
+
+        current = 6_200
+        finishSecond?.()
+      },
+    })
+
+    current = 1_500
+    ui.submit("one")
+    await Promise.resolve()
+    current = 4_500
+    wakeFirst?.()
+    while (!ui.events.some((event) => event.type === "turn.duration")) {
+      await Promise.resolve()
+    }
+    current = 5_200
+    ui.submit("two")
+    await secondDone
+    await Promise.resolve()
+    ui.api.close()
+    await task
+
+    expect(seen).toEqual(["one", "two"])
+    expect(ui.events.findLast((event) => event.type === "session.timing")).toEqual({
+      type: "session.timing",
+      timing: "total 5.2s · work 4.0s · between 1.2s",
+    })
   })
 
   test("exposes ordinary in-flight prompts for removal before sending", async () => {

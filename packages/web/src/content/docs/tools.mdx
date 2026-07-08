@@ -214,6 +214,26 @@ Load a [skill](/docs/skills) (a `SKILL.md` file) and return its content in the c
 
 ---
 
+### group
+
+Run multiple nested `task` subagent calls as one logical group and return one combined result after all nested calls finish.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "group": "allow",
+    "task": "allow"
+  }
+}
+```
+
+Use this when several subagents should work on parts of the same goal and the model should receive one grouped result. The `group` permission controls whether the grouping tool can run; each nested task still uses the existing `task` permission for the selected subagent.
+
+For implementation orchestration, `group` should be used as a real batch: put every ready, non-overlapping coder task in the same `calls` array so they start together. If contracts or handoff files let engine, CLI, tests, docs, adapters, or UI work proceed at the same time, they should be launched together instead of one after another.
+
+---
+
 ### todowrite
 
 Manage todo lists during coding sessions.

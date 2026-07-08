@@ -34,6 +34,15 @@ function load<A>(fn: (svc: Agent.Interface) => Effect.Effect<A>) {
   return Agent.Service.use(fn)
 }
 
+function expectOrderedText(value: string, terms: string[]) {
+  terms.reduce((previous, term) => {
+    const current = value.indexOf(term)
+    expect(current).toBeGreaterThanOrEqual(0)
+    expect(current).toBeGreaterThan(previous)
+    return current
+  }, -1)
+}
+
 const expectDefaultAgentError = Effect.fn("AgentTest.expectDefaultAgentError")(function* (message: string) {
   const exit = yield* load((svc) => svc.defaultAgent()).pipe(Effect.exit)
   expect(Exit.isFailure(exit)).toBe(true)
@@ -50,8 +59,11 @@ it.instance("returns default native agents when no config", () =>
     const names = agents.map((a) => a.name)
     expect(names).toContain("build")
     expect(names).toContain("plan")
+    expect(names).toContain("orchestrate")
     expect(names).toContain("general")
     expect(names).toContain("explore")
+    expect(names).toContain("planner")
+    expect(names).toContain("coder")
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
@@ -65,7 +77,444 @@ it.instance("build agent has correct default properties", () =>
     expect(build?.mode).toBe("primary")
     expect(build?.native).toBe(true)
     expect(evalPerm(build, "edit")).toBe("allow")
-    expect(evalPerm(build, "bash")).toBe("allow")
+    expect(evalPerm(build, "read")).toBe("allow")
+    expect(evalPerm(build, "group")).toBe("allow")
+    expect(evalPerm(build, "task")).toBe("allow")
+    expect(evalPerm(build, "glob")).toBe("allow")
+    expect(evalPerm(build, "grep")).toBe("allow")
+    expect(evalPerm(build, "bash")).toBe("ask")
+    expect(evalPerm(build, "question")).toBe("deny")
+    expect(evalPerm(build, "skill")).toBe("deny")
+    expect(evalPerm(build, "todowrite")).toBe("deny")
+    expect(evalPerm(build, "webfetch")).toBe("deny")
+    expect(evalPerm(build, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("orchestrate agent has grouped-subagent permissions", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    expect(orchestrate).toBeDefined()
+    expect(orchestrate?.mode).toBe("primary")
+    expect(orchestrate?.native).toBe(true)
+    expect(orchestrate?.description).toBe("Orchestrate mode. Decomposes large goals into grouped parallel subagent work.")
+    expect(orchestrate?.prompt).toContain("You are the Orchestrate agent")
+    expect(evalPerm(orchestrate, "question")).toBe("allow")
+    expect(evalPerm(orchestrate, "group")).toBe("allow")
+    expect(evalPerm(orchestrate, "task")).toBe("allow")
+    expect(Permission.evaluate("task", "general", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "explore", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "scout", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "planner", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("task", "coder", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("skill", "interface", orchestrate!.permission).action).toBe("allow")
+    expect(Permission.evaluate("skill", "customize-opencode", orchestrate!.permission).action).toBe("deny")
+    expect(evalPerm(orchestrate, "edit")).toBe("allow")
+    expect(evalPerm(orchestrate, "read")).toBe("allow")
+    expect(evalPerm(orchestrate, "glob")).toBe("allow")
+    expect(evalPerm(orchestrate, "grep")).toBe("allow")
+    expect(evalPerm(orchestrate, "bash")).toBe("ask")
+    expect(evalPerm(orchestrate, "skill")).toBe("deny")
+    expect(evalPerm(orchestrate, "todowrite")).toBe("deny")
+    expect(evalPerm(orchestrate, "webfetch")).toBe("deny")
+    expect(evalPerm(orchestrate, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("coder agent is an implementation subagent without recursive delegation", () =>
+  Effect.gen(function* () {
+    const coder = yield* load((svc) => svc.get("coder"))
+    expect(coder).toBeDefined()
+    expect(coder?.mode).toBe("subagent")
+    expect(coder?.native).toBe(true)
+    expect(coder?.description).toBe("Implementation subagent for scoped, high-quality coding work.")
+    expect(coder?.prompt).toContain("You are the Coder subagent")
+    expect(evalPerm(coder, "read")).toBe("allow")
+    expect(Permission.evaluate("read", "secrets.env", coder!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.local", coder!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.example", coder!.permission).action).toBe("allow")
+    expect(evalPerm(coder, "list")).toBe("allow")
+    expect(evalPerm(coder, "glob")).toBe("allow")
+    expect(evalPerm(coder, "grep")).toBe("allow")
+    expect(evalPerm(coder, "edit")).toBe("allow")
+    expect(evalPerm(coder, "bash")).toBe("ask")
+    expect(evalPerm(coder, "question")).toBe("deny")
+    expect(evalPerm(coder, "task")).toBe("deny")
+    expect(evalPerm(coder, "group")).toBe("deny")
+    expect(evalPerm(coder, "todowrite")).toBe("deny")
+    expect(evalPerm(coder, "webfetch")).toBe("deny")
+    expect(evalPerm(coder, "websearch")).toBe("deny")
+  }),
+)
+
+it.instance("planner agent is a read-only native planning subagent", () =>
+  Effect.gen(function* () {
+    const planner = yield* load((svc) => svc.get("planner"))
+    expect(planner).toBeDefined()
+    expect(planner?.mode).toBe("subagent")
+    expect(planner?.native).toBe(true)
+    expect(planner?.description).toBe(
+      "Creates one concrete implementation plan for a complex task. Use multiple planner agents in parallel to compare approaches.",
+    )
+    expect(planner?.prompt).toContain("You are the Planner subagent")
+    expect(evalPerm(planner, "read")).toBe("allow")
+    expect(Permission.evaluate("read", "secrets.env", planner!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.local", planner!.permission).action).toBe("ask")
+    expect(Permission.evaluate("read", "secrets.env.example", planner!.permission).action).toBe("allow")
+    expect(evalPerm(planner, "list")).toBe("allow")
+    expect(evalPerm(planner, "glob")).toBe("allow")
+    expect(evalPerm(planner, "grep")).toBe("allow")
+    expect(evalPerm(planner, "webfetch")).toBe("allow")
+    expect(evalPerm(planner, "websearch")).toBe("allow")
+    expect(evalPerm(planner, "bash")).toBe("deny")
+    expect(evalPerm(planner, "edit")).toBe("deny")
+    expect(evalPerm(planner, "write")).toBe("deny")
+    expect(evalPerm(planner, "apply_patch")).toBe("deny")
+    expect(evalPerm(planner, "task")).toBe("deny")
+    expect(evalPerm(planner, "group")).toBe("deny")
+    expect(evalPerm(planner, "todowrite")).toBe("deny")
+  }),
+)
+
+it.instance("orchestrate prompt documents grouped multi-plan workflow and question discipline", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const prompt = orchestrate?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("question tool")
+    expect(lower).toContain("lead the work")
+    expect(lower).toContain("root coordinator")
+    expect(lower).toContain("leadership responsibilities")
+    expect(lower).toContain("leader, guide, root coordinator, dispatcher, supervisor, reviewer, integrator, and synthesizer")
+    expect(lower).toContain("understand the repository")
+    expect(lower).toContain("clarify the goal")
+    expect(lower).toContain("guide the system from the user's goal to a verified result")
+    expect(lower).toContain("choose the right workflow")
+    expect(lower).toContain("act with leadership")
+    expect(lower).toContain("shared objectives")
+    expect(lower).toContain("delegate scoped work")
+    expect(lower).toContain("delegate scoped tasks")
+    expect(lower).toContain("supervise results")
+    expect(lower).toContain("protect ownership boundaries")
+    expect(lower).toContain("group related work by common objective")
+    expect(lower).toContain("collect results from grouped workstreams")
+    expect(lower).toContain("resolve conflicts between plans, contracts, coder outputs, tests, and repository reality")
+    expect(lower).toContain("one coherent answer")
+    expect(lower).toContain("do not scatter agents randomly")
+    expect(lower).toContain("cluster related agents")
+    expect(lower).toContain("common goal")
+    expect(lower).toContain("shared objective")
+    expect(lower).toContain("group tool")
+    expect(lower).toContain("task calls")
+    expect(lower).toContain("multi-plan")
+    expect(lower).toContain("inspect the repository first")
+    expect(lower).toContain("ask targeted questions")
+    expect(lower).toContain("do not ask questions that can be answered by reading the repo")
+    expect(lower).toContain("ask questions when they are likely to materially improve the work")
+    expect(lower).toContain("not only when you are completely blocked")
+    expect(lower).toContain("default to asking at least one targeted question")
+    expect(lower).toContain("before multi-plan generation")
+    expect(lower).toContain("target platform")
+    expect(lower).toContain("framework")
+    expect(lower).toContain("data model")
+    expect(lower).toContain("acceptance criteria")
+    expect(lower).toContain("do not let planner fanout substitute for user clarification")
+    expect(lower).toContain("ask first, then plan")
+    expect(lower).toContain("usually 1-3 questions")
+    expect(lower).toContain("discover: inspect the repo before planning")
+    expect(lower).toContain("clarify: use the question tool")
+    expect(lower).toContain("plan: for large or ambiguous tasks")
+    expect(lower).toContain("interface: before parallel coding")
+    expect(lower).toContain("dispatch: use group for implementation workstreams")
+    expect(lower).toContain("guide parallelism")
+    expect(lower).toContain("handle blockers")
+    expect(lower).toContain("review: after coder groups finish")
+    expect(lower).toContain("synthesize: return one concise final summary")
+    expect(lower).toContain("coder dispatch gate")
+    expect(lower).toContain("before every implementation tool call")
+    expect(lower).toContain("one group call containing all ready non-conflicting coder slices")
+    expect(lower).toContain("a single-coder dispatch is acceptable only")
+    expect(lower).toContain("maximize the safe ready batch before narrating the next phase")
+    expect(lower).toContain("one group call equals one logical bucket")
+    expect(lower).toContain("use multiple group calls in the same assistant message")
+    expect(lower).toContain("cohort of subagents")
+    expect(lower).toContain("group related work into workstreams")
+    expect(lower).toContain("multi-task coordination")
+    expect(lower).toContain("fan-out/fan-in execution")
+    expect(lower).toContain("fan out independent work to subagents, then fan in one grouped result")
+    expect(lower).toContain("fan out related work")
+    expect(lower).toContain("fan in the results")
+    expect(lower).toContain("completion barrier")
+    expect(lower).toContain("parallel lanes")
+    expect(lower).toContain("separate workstreams")
+    expect(lower).toContain("cluster by objective")
+    expect(lower).toContain("use parallelism to reduce waiting")
+    expect(lower).toContain("keep each workstream's ownership boundary clear")
+    expect(lower).toContain("use sequential flow when one result must feed the next")
+    expect(lower).toContain("priority")
+    expect(lower).toContain("avoid having two subagents edit the same file")
+    expect(lower).toContain("after grouped results return")
+    expect(lower).toContain("for small tasks, do not orchestrate")
+    expect(lower).toContain("for tiny edits")
+    expect(lower).toContain("if the repo appears empty or uninitialized")
+    expect(lower).toContain("fanout sizing protocol")
+    expect(lower).toContain("user prompt breadth")
+    expect(lower).toContain("potential difficulty")
+    expect(lower).toContain("codebase size")
+    expect(lower).toContain("independent workstreams")
+    expect(lower).toContain("failure blast radius")
+    expect(lower).toContain("use 2 planner tasks for medium tasks")
+    expect(lower).toContain("use 3 planner tasks for large tasks")
+    expect(lower).toContain("use 4 planner tasks")
+    expect(lower).toContain("distinct angle or independent workstream")
+    expect(lower).toContain("prefer 2-6 task calls")
+    expect(lower).toContain("do not make the user watch avoidable serial phases")
+    expect(lower).toContain("implementation dispatch protocol")
+    expect(lower).toContain("assign each slice to a coder task")
+    expect(lower).toContain("use group to run independent coder tasks concurrently")
+    expect(lower).toContain("readiness batching check")
+    expect(lower).toContain("parallel dispatch audit")
+    expect(lower).toContain("batch-first dispatch loop")
+    expect(lower).toContain("construct the widest safe ready-now batch")
+    expect(lower).toContain("classify each possible implementation slice")
+    expect(lower).toContain("ready-now, blocked-by-dependency, or not-worth-a-subagent")
+    expect(lower).toContain("maintain a pending-slices list")
+    expect(lower).toContain("treat user wait time as a resource")
+    expect(lower).toContain("descriptive group and call names")
+    expect(lower).toContain("serial coder drip-feeding is a dispatch failure")
+    expect(lower).toContain("do not split foundation -> engine -> cli -> tests into four user waits")
+    expect(lower).toContain("launch them together")
+    expect(lower).toContain("contract-ready task should not wait for sibling code")
+    expect(lower).toContain("one coder per coherent ownership boundary")
+    expect(lower).toContain("interface or handoff readme path")
+    expect(lower).toContain("use the interface skill")
+    expect(lower).toContain("contract-first interface phase")
+    expect(lower).toContain("contract/interface files")
+    expect(lower).toContain("handoff readmes")
+    expect(lower).toContain("work-package map")
+    expect(lower).toContain("handoff_files arrays for each coder task")
+    expect(lower).toContain("ready-now coder batch")
+    expect(lower).toContain("blocked-by-dependency coder batch")
+    expect(lower).toContain("before launching multiple coder agents")
+    expect(lower).toContain("before coder dispatch")
+    expect(lower).toContain("loading the interface skill is not a reason to self-implement")
+    expect(lower).toContain("task input handoff_files array")
+    expect(lower).toContain("do not paste large handoff docs")
+    expect(lower).toContain("keep coder prompts small enough to scan")
+    expect(lower).toContain("for real coding work, default to coder agents")
+    expect(lower).toContain("do not describe yourself as the sole implementer")
+    expect(lower).toContain("do not use being the active agent as a reason to skip coder dispatch")
+    expect(lower).toContain("do not use speed, convenience, a complete mental model, or tightly coupled files")
+    expect(lower).toContain("tightly coupled")
+    expect(lower).toContain("sequence coder work")
+    expect(lower).toContain("sequential coder groups")
+    expect(lower).toContain("do not announce phase 2 as parallel and then call only engine")
+    expect(lower).toContain("do not split engine, cli, tests, docs, adapters, or ui")
+    expect(lower).toContain("do not show the user giant coder prompts")
+    expect(lower).toContain("shared types")
+    expect(lower).toContain("one larger coherent slice")
+    expect(lower).toContain("evidence for coder dispatch")
+    expect(lower).toContain("post-foundation anti-pattern")
+    expect(lower).toContain("foundation complete -> engine-services only -> wait -> cli-interface only")
+    expect(lower).toContain("if you defer a coder slice after foundation")
+    expect(lower).toContain("name the exact missing concrete artifact")
+    expect(lower).toContain("use direct editing only for tiny")
+    expect(lower).toContain("if you self-implement")
+    expect(lower).toContain("medium, large, multi-file, or multi-module coding")
+    expect(lower).toContain("group + coder task calls")
+    expect(lower).toContain("treat interface contracts as source of truth")
+    expect(lower).toContain("boundary-based")
+    expect(lower).toContain("<coder_result state=\"blocked\">")
+    expect(lower).toContain("<questions_for_orchestrator>")
+    expect(lower).toContain("answer coder questions yourself")
+    expect(lower).toContain("user-facing question tool only when")
+    expect(lower).toContain("redispatch only the affected coder tasks")
+    expect(lower).toContain("do not restart all implementation work unnecessarily")
+    expect(lower).toContain("update the relevant interface files or handoff readme")
+    expect(lower).toContain("review and reconcile coder output")
+    expect(lower).toContain("quality gate")
+    expect(lower).toContain("enforce a quality gate before final response")
+    expect(lower).toContain("prefer cohesive, reusable, composable implementation")
+    expect(lower).toContain("reject scattered patches")
+    expect(lower).toContain("aligned with interfaces and handoff docs")
+    expect(lower).toContain("do not immediately declare success")
+    expect(lower).toContain("inspect actual diffs")
+    expect(lower).toContain("git diff/status")
+    expect(lower).toContain("compare changes against interface docs")
+    expect(lower).toContain("run focused tests")
+    expect(lower).toContain("broken interfaces")
+    expect(lower).toContain("inconsistent contracts")
+    expect(lower).toContain("duplicated abstractions")
+    expect(lower).toContain("style mismatches")
+    expect(lower).toContain("missing tests")
+    expect(lower).toContain("leaky boundaries")
+    expect(lower).toContain("security, reliability, and performance risks")
+    expect(lower).toContain("fix small issues directly")
+    expect(lower).toContain("targeted follow-up coder task")
+    expect(lower).toContain("use another group for multiple independent follow-up fixes")
+    expect(lower).toContain("limit review/fix loops to at most two redispatch rounds")
+    expect(lower).toContain("do not claim completion before reviewing coder output")
+    expect(lower).toContain("final responses")
+    expect(lower).toContain("what not to touch")
+    expect(lower).toContain("\"handoff_files\"")
+    expect(lower).toContain("subagent_type\": \"coder")
+    expect(lower).toContain("subagent_type\": \"planner")
+    expect(lower).toContain("auto mode awareness")
+    expect(lower).toContain("focused project-local verification commands freely")
+    expect(lower).toContain("auto does not approve deploys, publishing, git pushes, or system mutation")
+    expect(lower).toContain("do not deploy, publish, push, or mutate system paths through auto")
+    expect(lower).toContain("report verification honestly")
+    expect(lower).toContain("ask the user only for product, architecture")
+  }),
+)
+
+it.instance("orchestrate prompt keeps lifecycle stages and role transitions in order", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const lower = (orchestrate?.prompt ?? "").toLowerCase()
+
+    expectOrderedText(lower, [
+      "discover: inspect the repo before planning",
+      "clarify: use the question tool",
+      "plan: for large or ambiguous tasks",
+      "interface: before parallel coding",
+      "dispatch: use group for implementation workstreams",
+      "guide parallelism",
+      "handle blockers",
+      "review: after coder groups finish",
+      "synthesize: return one concise final summary",
+    ])
+
+    expectOrderedText(lower, [
+      "launch a high-priority group named multi-plan-generation",
+      "after plan selection, use the interface skill",
+      "after interface preparation, launch grouped implementation tasks",
+    ])
+  }),
+)
+
+it.instance("orchestrate prompt preserves small-task direct-tool exception", () =>
+  Effect.gen(function* () {
+    const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+    const lower = (orchestrate?.prompt ?? "").toLowerCase()
+
+    expectOrderedText(lower, [
+      "for small tasks, do not orchestrate",
+      "use direct read, edit, and bash tools",
+      "one file is involved",
+      "the fix is obvious",
+      "subagents would add overhead",
+      "no parallelism is useful",
+      "no architecture decision is needed",
+    ])
+    expect(lower).toContain("use grouped subagents when the task has multiple parts")
+    expect(lower).toContain("for large or ambiguous tasks, launch a high-priority group")
+  }),
+)
+
+it.instance("coder prompt requires scoped implementation quality and structured output", () =>
+  Effect.gen(function* () {
+    const coder = yield* load((svc) => svc.get("coder"))
+    const prompt = coder?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("interface or handoff readme")
+    expect(lower).toContain("handoff_files")
+    expect(lower).toContain("read it first")
+    expect(lower).toContain("read the handoff readme and interface contracts first")
+    expect(lower).toContain("selected plan, interface contract, handoff readme, work-package map")
+    expect(lower).toContain("work inside your assigned ownership lane")
+    expect(lower).toContain("assume the handoff files contain the detailed context")
+    expect(lower).toContain("treat interface contracts as the source of truth")
+    expect(lower).toContain("implement the assigned contract")
+    expect(lower).toContain("avoid changing shared contracts unless explicitly told")
+    expect(lower).toContain("escalate a structured question to the orchestrator")
+    expect(lower).toContain("structured blocker format")
+    expect(lower).toContain("report a structured question to the orchestrator instead of silently inventing incompatible behavior")
+    expect(lower).toContain("expect the orchestrator to review your work")
+    expect(lower).toContain("return enough information for review")
+    expect(lower).toContain("keep changes focused and reviewable")
+    expect(lower).toContain("sequential tightly coupled implementation")
+    expect(lower).toContain("make the next coder's job easier")
+    expect(lower).toContain("reporting any ordering assumptions")
+    expect(lower).toContain("if sibling implementation code is not present yet")
+    expect(lower).toContain("implement against the contract")
+    expect(lower).toContain("do not stop only because another coder is working")
+    expect(lower).toContain("in auto mode, run focused local verification commands when useful")
+    expect(lower).toContain("assigned package or directory")
+    expect(lower).toContain("do not run deploy, publish, git push, or system mutation commands")
+    expect(lower).toContain("report all commands run and their results")
+    expect(lower).toContain("do not hide skipped verification")
+    expect(lower).toContain("flag any intentional deviation from interface docs")
+    expect(lower).toContain("<deviations_from_interface_docs>")
+    expect(lower).toContain("continue independently when ambiguity has a safe local default")
+    expect(lower).toContain("escalate only material blockers")
+    expect(lower).toContain("<coder_result state=\"blocked\">")
+    expect(lower).toContain("<question priority=\"high\" type=\"contract\">")
+    expect(lower).toContain("<recommended_options>")
+    expect(lower).toContain("<safe_default>")
+    expect(lower).toContain("contract: interface or handoff doc is incomplete")
+    expect(lower).toContain("integration: external api")
+    expect(lower).toContain("do not use the user-facing question tool")
+    expect(lower).toContain("assigned scope")
+    expect(lower).toContain("reusable, composable code")
+    expect(lower).toContain("clear boundaries between modules")
+    expect(lower).toContain("write code that is easy to follow")
+    expect(lower).toContain("make the structure tell the story")
+    expect(lower).toContain("names, modules, and boundaries that explain the design")
+    expect(lower).toContain("prefer small cohesive functions and clear data flow")
+    expect(lower).toContain("prefer reusable and composable pieces over one-off patches")
+    expect(lower).toContain("comments only when they clarify intent")
+    expect(lower).toContain("add or update tests")
+    expect(lower).toContain("questions_for_orchestrator")
+    expect(lower).toContain("<coder_result>")
+    expect(lower).toContain("<handoff_docs_read>")
+    expect(lower).toContain("<contracts_implemented>")
+    expect(lower).toContain("<files_inspected>")
+    expect(lower).toContain("<files_changed>")
+    expect(lower).toContain("<implementation_notes>")
+    expect(lower).toContain("<quality_notes>")
+    expect(lower).toContain("<tests_run>")
+    expect(lower).toContain("<risks>")
+  }),
+)
+
+it.instance("planner prompt requires read-only structured single-plan output", () =>
+  Effect.gen(function* () {
+    const planner = yield* load((svc) => svc.get("planner"))
+    const prompt = planner?.prompt ?? ""
+    const lower = prompt.toLowerCase()
+
+    expect(lower).toContain("stay read-only")
+    expect(lower).toContain("create one concrete plan for the assigned angle")
+    expect(lower).toContain("produce exactly one concrete")
+    expect(lower).toContain("not multiple alternatives")
+    expect(lower).toContain("concrete, repo-aware implementation plan")
+    expect(lower).toContain("do not produce several alternatives")
+    expect(lower).toContain("leadership decisions")
+    expect(lower).toContain("inspect relevant project files")
+    expect(lower).toContain("repository is empty")
+    expect(lower).toContain("chosen approach")
+    expect(lower).toContain("interface boundaries")
+    expect(lower).toContain("ownership lanes")
+    expect(lower).toContain("work-package candidates")
+    expect(lower).toContain("selected plan for interface contracts")
+    expect(lower).toContain("recommended coder work packages")
+    expect(lower).toContain("sequential coder phases")
+    expect(lower).toContain("same group after contracts exist")
+    expect(lower).toContain("truly require concrete earlier output")
+    expect(lower).toContain("interface contracts and ownership boundaries")
+    expect(lower).toContain("vague advice")
+    expect(lower).toContain("do not recommend single-agent implementation")
+    expect(lower).toContain("<plan>")
+    expect(lower).toContain("<repo_context>")
+    expect(lower).toContain("<chosen_approach>")
+    expect(lower).toContain("<interface_boundaries>")
+    expect(lower).toContain("<work_package_candidates>")
+    expect(lower).toContain("<implementation_phases>")
+    expect(lower).toContain("<verification_strategy>")
+    expect(lower).toContain("<open_questions>")
   }),
 )
 
@@ -78,6 +527,28 @@ it.instance("plan agent denies edits except .opencode/plans/*", () =>
     // But specific path is allowed
     expect(Permission.evaluate("edit", ".opencode/plans/foo.md", plan!.permission).action).toBe("allow")
   }),
+)
+
+it.instance(
+  "auto permission mode does not weaken plan or planner read-only restrictions",
+  () =>
+    Effect.gen(function* () {
+      const plan = yield* load((svc) => svc.get("plan"))
+      const planner = yield* load((svc) => svc.get("planner"))
+      expect(plan).toBeDefined()
+      expect(planner).toBeDefined()
+      expect(evalPerm(plan, "edit")).toBe("deny")
+      expect(evalPerm(plan, "bash")).toBe("deny")
+      expect(evalPerm(plan, "write")).toBe("deny")
+      expect(evalPerm(plan, "apply_patch")).toBe("deny")
+      expect(evalPerm(planner, "edit")).toBe("deny")
+      expect(evalPerm(planner, "bash")).toBe("deny")
+      expect(evalPerm(planner, "write")).toBe("deny")
+      expect(evalPerm(planner, "apply_patch")).toBe("deny")
+      expect(evalPerm(planner, "task")).toBe("deny")
+      expect(evalPerm(planner, "group")).toBe("deny")
+    }),
+  { config: { permission_mode: "auto" } },
 )
 
 it.instance("plan agent denies the general subagent by default", () =>
@@ -282,6 +753,44 @@ it.instance(
 )
 
 it.instance(
+  "user permission overrides keep last-rule semantics for orchestrate and planner",
+  () =>
+    Effect.gen(function* () {
+      const orchestrate = yield* load((svc) => svc.get("orchestrate"))
+      const planner = yield* load((svc) => svc.get("planner"))
+      expect(orchestrate).toBeDefined()
+      expect(planner).toBeDefined()
+
+      expect(evalPerm(orchestrate, "group")).toBe("deny")
+      expect(Permission.evaluate("task", "planner", orchestrate!.permission).action).toBe("deny")
+      expect(evalPerm(planner, "edit")).toBe("allow")
+      expect(evalPerm(planner, "task")).toBe("allow")
+      expect(evalPerm(planner, "group")).toBe("allow")
+    }),
+  {
+    config: {
+      agent: {
+        orchestrate: {
+          permission: {
+            group: "deny",
+            task: {
+              planner: "deny",
+            },
+          },
+        },
+        planner: {
+          permission: {
+            edit: "allow",
+            task: "allow",
+            group: "allow",
+          },
+        },
+      },
+    },
+  },
+)
+
+it.instance(
   "global permission config applies to all agents",
   () =>
     Effect.gen(function* () {
@@ -474,10 +983,10 @@ it.instance("default permission includes doom_loop and external_directory as ask
   }),
 )
 
-it.instance("webfetch is allowed by default", () =>
+it.instance("webfetch is denied by default", () =>
   Effect.gen(function* () {
     const build = yield* load((svc) => svc.get("build"))
-    expect(evalPerm(build, "webfetch")).toBe("allow")
+    expect(evalPerm(build, "webfetch")).toBe("deny")
   }),
 )
 
@@ -676,6 +1185,20 @@ it.instance(
 )
 
 it.instance(
+  "defaultAgent respects default_agent config set to orchestrate",
+  () =>
+    Effect.gen(function* () {
+      const agent = yield* load((svc) => svc.defaultAgent())
+      expect(agent).toBe("orchestrate")
+    }),
+  {
+    config: {
+      default_agent: "orchestrate",
+    },
+  },
+)
+
+it.instance(
   "defaultAgent respects default_agent config set to custom agent with mode all",
   () =>
     Effect.gen(function* () {
@@ -700,6 +1223,26 @@ it.instance(
   {
     config: {
       default_agent: "explore",
+    },
+  },
+)
+
+it.instance(
+  "defaultAgent throws when default_agent points to planner subagent",
+  () => expectDefaultAgentError('default agent "planner" is a subagent'),
+  {
+    config: {
+      default_agent: "planner",
+    },
+  },
+)
+
+it.instance(
+  "defaultAgent throws when default_agent points to coder subagent",
+  () => expectDefaultAgentError('default agent "coder" is a subagent'),
+  {
+    config: {
+      default_agent: "coder",
     },
   },
 )
@@ -749,6 +1292,7 @@ it.instance(
       agent: {
         build: { disable: true },
         plan: { disable: true },
+        orchestrate: { disable: true },
       },
     },
   },

@@ -19,6 +19,11 @@ import { MessageID, SessionID } from "@/session/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { Permission } from "@/permission"
+import { LLMRequestPrep } from "@/session/llm/request"
+import { jsonSchema } from "ai"
+import { Provider } from "@/provider/provider"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 
 const configLayer = TestConfig.layer({
   directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
@@ -55,7 +60,127 @@ const replacements = [
 ] as const
 
 const it = testEffect(LayerNode.compile(root, replacements))
+const nonQuestionClient = testEffect(
+  LayerNode.compile(root, [
+    [Config.node, configLayer],
+    [RuntimeFlags.node, RuntimeFlags.layer({ client: "test" })],
+  ]),
+)
+const questionFlagClient = testEffect(
+  LayerNode.compile(root, [
+    [Config.node, configLayer],
+    [RuntimeFlags.node, RuntimeFlags.layer({ client: "test", enableQuestionTool: true })],
+  ]),
+)
 const withBrokenPlugin = testEffect(LayerNode.compile(root, [...replacements, [Plugin.node, brokenPluginLayer]]))
+
+const llmModel: Provider.Model = {
+  id: ModelV2.ID.make("opencode/gpt-5.2"),
+  providerID: ProviderV2.ID.opencode,
+  api: {
+    id: "gpt-5.2",
+    url: "https://opencode.local",
+    npm: "@ai-sdk/openai",
+  },
+  name: "gpt-5.2",
+  capabilities: {
+    temperature: true,
+    reasoning: false,
+    attachment: false,
+    toolcall: true,
+    input: { text: true, audio: false, image: false, video: false, pdf: false },
+    output: { text: true, audio: false, image: false, video: false, pdf: false },
+    interleaved: false,
+  },
+  cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+  limit: { context: 128_000, output: 8192 },
+  status: "active",
+  options: {},
+  headers: {},
+  release_date: "2026-01-01",
+}
+
+const llmProvider: Provider.Info = {
+  id: ProviderV2.ID.opencode,
+  name: "opencode",
+  source: "custom",
+  env: [],
+  options: {},
+  models: { [llmModel.id]: llmModel },
+}
+
+const cliRuntimeFlags: RuntimeFlags.Info = {
+  autoShare: false,
+  pure: false,
+  disableDefaultPlugins: false,
+  disableEmbeddedWebUi: false,
+  disableExternalSkills: false,
+  disableLspDownload: false,
+  disableClaudeCodePrompt: false,
+  disableClaudeCodeSkills: false,
+  enableExa: false,
+  enableParallel: false,
+  enableExperimentalModels: false,
+  enableQuestionTool: false,
+  experimentalReferences: false,
+  experimentalBackgroundSubagents: false,
+  experimentalLspTy: false,
+  experimentalLspTool: false,
+  experimentalOxfmt: false,
+  experimentalPlanMode: false,
+  experimentalEventSystem: false,
+  experimentalWorkspaces: false,
+  experimentalIconDiscovery: false,
+  outputTokenMax: 32_000,
+  bashDefaultTimeoutMs: undefined,
+  experimentalNativeLlm: false,
+  experimentalWebSockets: false,
+  client: "cli",
+}
+
+const pluginStub = {
+  trigger: (_name: string, _input: unknown, output: unknown) => Effect.succeed(output),
+  list: () => Effect.succeed([]),
+  init: () => Effect.void,
+} as Plugin.Interface
+
+function testTools(ids: string[]) {
+  return Object.fromEntries(
+    ids.map((id) => [
+      id,
+      {
+        description: id,
+        inputSchema: jsonSchema({ type: "object", properties: {} }),
+      },
+    ]),
+  )
+}
+
+const preparedToolIDs = Effect.fn("RegistryTest.preparedToolIDs")(function* (agent: Agent.Info, ids: string[]) {
+  const user: SessionV1.User = {
+    id: SessionV1.MessageID.ascending("msg_user-test"),
+    sessionID: SessionID.make("ses_test"),
+    role: "user",
+    time: { created: Date.now() },
+    agent: agent.name,
+    model: { providerID: ProviderV2.ID.opencode, modelID: ModelV2.ID.make("gpt-5.2") },
+  }
+  const result = yield* LLMRequestPrep.prepare({
+    user,
+    sessionID: user.sessionID,
+    model: llmModel,
+    agent,
+    system: [],
+    messages: [{ role: "user", content: "Hello" }],
+    tools: testTools(ids),
+    provider: llmProvider,
+    auth: undefined,
+    plugin: pluginStub,
+    flags: cliRuntimeFlags,
+    isWorkflow: false,
+  })
+  return Object.keys(result.tools).sort()
+})
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -85,6 +210,157 @@ describe("tool.registry", () => {
 
       expect(task?.jsonSchema).toBeDefined()
       expect((task?.jsonSchema?.properties as Record<string, unknown> | undefined)?.background).toBeUndefined()
+    }),
+  )
+
+  it.instance("exposes question to orchestrate in cli clients when permission allows", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agent = yield* Agent.Service
+      const orchestrate = yield* agent.get("orchestrate")
+      if (!orchestrate) throw new Error("orchestrate agent not found")
+
+      const ids = yield* registry.ids()
+
+      expect(ids).toContain("question")
+      expect(Permission.evaluate("question", "*", orchestrate.permission).action).toBe("allow")
+    }),
+  )
+
+  nonQuestionClient.instance("hides question for clients outside the normal interactive set", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+
+      expect(ids).not.toContain("question")
+    }),
+  )
+
+  questionFlagClient.instance("exposes question for non-interactive clients when explicitly enabled", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+
+      expect(ids).toContain("question")
+    }),
+  )
+
+  it.instance("provider-visible orchestrate tools include question, group, and task when allowed", () =>
+    Effect.gen(function* () {
+      const agent = yield* Agent.Service
+      const orchestrate = yield* agent.get("orchestrate")
+      if (!orchestrate) throw new Error("orchestrate agent not found")
+
+      const ids = yield* preparedToolIDs(orchestrate, [
+        "question",
+        "group",
+        "skill",
+        "task",
+        "read",
+        "edit",
+        "write",
+        "apply_patch",
+        "bash",
+        "glob",
+        "grep",
+        "webfetch",
+        "websearch",
+        "todowrite",
+      ])
+
+      expect(ids).toContain("question")
+      expect(ids).toContain("group")
+      expect(ids).toContain("skill")
+      expect(ids).toContain("task")
+      expect(ids).toContain("read")
+      expect(ids).toContain("glob")
+      expect(ids).toContain("grep")
+      expect(ids).toContain("bash")
+      expect(ids).not.toContain("webfetch")
+      expect(ids).not.toContain("websearch")
+      expect(ids).not.toContain("todowrite")
+    }),
+  )
+
+  it.instance("provider-visible planner tools exclude mutation and recursive delegation tools by default", () =>
+    Effect.gen(function* () {
+      const agent = yield* Agent.Service
+      const planner = yield* agent.get("planner")
+      if (!planner) throw new Error("planner agent not found")
+
+      const ids = yield* preparedToolIDs(planner, [
+        "question",
+        "group",
+        "task",
+        "read",
+        "edit",
+        "write",
+        "apply_patch",
+        "bash",
+        "glob",
+        "grep",
+        "webfetch",
+        "websearch",
+        "todowrite",
+      ])
+
+      expect(ids).toContain("read")
+      expect(ids).toContain("glob")
+      expect(ids).toContain("grep")
+      expect(ids).toContain("webfetch")
+      expect(ids).toContain("websearch")
+      expect(ids).not.toContain("question")
+      expect(ids).not.toContain("group")
+      expect(ids).not.toContain("task")
+      expect(ids).not.toContain("edit")
+      expect(ids).not.toContain("write")
+      expect(ids).not.toContain("apply_patch")
+      expect(ids).not.toContain("bash")
+      expect(ids).not.toContain("todowrite")
+    }),
+  )
+
+  it.instance("provider-visible coder tools exclude direct user questions and recursive delegation", () =>
+    Effect.gen(function* () {
+      const agent = yield* Agent.Service
+      const coder = yield* agent.get("coder")
+      if (!coder) throw new Error("coder agent not found")
+
+      const ids = yield* preparedToolIDs(coder, [
+        "question",
+        "group",
+        "task",
+        "read",
+        "edit",
+        "write",
+        "apply_patch",
+        "bash",
+        "glob",
+        "grep",
+        "todowrite",
+      ])
+
+      expect(ids).toContain("read")
+      expect(ids).toContain("edit")
+      expect(ids).toContain("write")
+      expect(ids).toContain("apply_patch")
+      expect(ids).toContain("glob")
+      expect(ids).toContain("grep")
+      expect(ids).toContain("bash")
+      expect(ids).not.toContain("question")
+      expect(ids).not.toContain("group")
+      expect(ids).not.toContain("task")
+      expect(ids).not.toContain("todowrite")
+    }),
+  )
+
+  it.instance("does not register a multi_plan tool", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+
+      expect(ids).not.toContain("multi_plan")
+      expect(ids).not.toContain("multi-plan")
     }),
   )
 

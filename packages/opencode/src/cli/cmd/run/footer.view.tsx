@@ -16,6 +16,7 @@ import {
   RUN_SUBAGENT_PANEL_ROWS,
   RunCommandMenuBody,
   RunModelSelectBody,
+  RunPermissionModeSelectBody,
   RunQueuedPromptSelectBody,
   RunSkillSelectBody,
   RunSubagentSelectBody,
@@ -48,6 +49,7 @@ import type {
   RunCommand,
   RunDiffStyle,
   RunInput,
+  RunPermissionMode,
   RunPrompt,
   RunProvider,
   RunResource,
@@ -88,6 +90,7 @@ type RunFooterViewProps = {
   diffStyle?: RunDiffStyle
   tuiConfig: RunTuiConfig
   backgroundSubagents: boolean
+  autoPermission: () => boolean
   history?: RunPrompt[]
   agent: string
   onSubmit: (input: RunPrompt) => boolean
@@ -95,6 +98,7 @@ type RunFooterViewProps = {
   onQuestionReply: (input: QuestionReply) => void | Promise<void>
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycle: () => void
+  onPermissionModeSelect: (mode: RunPermissionMode) => void
   onInterrupt: () => boolean
   onBackground?: () => void
   onEditorOpen: (input: { value: string }) => Promise<string | undefined>
@@ -140,6 +144,7 @@ export function RunFooterView(props: RunFooterViewProps) {
   const skilling = createMemo(() => active().type === "prompt" && route().type === "skill")
   const modeling = createMemo(() => active().type === "prompt" && route().type === "model")
   const varianting = createMemo(() => active().type === "prompt" && route().type === "variant")
+  const permissionMode = createMemo(() => active().type === "prompt" && route().type === "permission-mode")
   const panel = createMemo(
     () =>
       active().type === "permission" ||
@@ -149,7 +154,8 @@ export function RunFooterView(props: RunFooterViewProps) {
       commanding() ||
       skilling() ||
       modeling() ||
-      varianting(),
+      varianting() ||
+      permissionMode(),
   )
   const selected = createMemo(() => {
     const current = route()
@@ -242,6 +248,7 @@ export function RunFooterView(props: RunFooterViewProps) {
   const exiting = createMemo(() => props.state().exit > 0)
   const queue = createMemo(() => props.state().queue)
   const usage = createMemo(() => props.state().usage)
+  const timing = createMemo(() => props.state().timing)
   const interruptLabel = createMemo(() => {
     if (!interrupt()) {
       return
@@ -306,6 +313,11 @@ export function RunFooterView(props: RunFooterViewProps) {
 
   const openVariant = () => {
     setRoute({ type: "variant" })
+    props.onSubagentSelect?.(undefined)
+  }
+
+  const openPermissionMode = () => {
+    setRoute({ type: "permission-mode" })
     props.onSubagentSelect?.(undefined)
   }
 
@@ -375,6 +387,7 @@ export function RunFooterView(props: RunFooterViewProps) {
     onExitRequest: props.onExitRequest,
     onExit: props.onExit,
     onSkillMenu: openSkillMenu,
+    onPermissionMenu: openPermissionMode,
     onRows: props.onRows,
     onStatus: props.onStatus,
   })
@@ -415,11 +428,11 @@ export function RunFooterView(props: RunFooterViewProps) {
     return shell() ? "Shell mode" : ""
   })
   const activityMeta = createMemo(() => {
-    if (!responsive().statusline.showActivityMeta || usage().length === 0) {
+    if (!responsive().statusline.showActivityMeta) {
       return ""
     }
 
-    return usage()
+    return [props.autoPermission() ? "AUTO" : "", timing(), usage()].filter((item) => item.length > 0).join(" · ")
   })
   const modelStatus = createMemo(() => {
     const current = props.currentModel()
@@ -602,6 +615,7 @@ export function RunFooterView(props: RunFooterViewProps) {
       current.type !== "skill" &&
       current.type !== "model" &&
       current.type !== "variant" &&
+      current.type !== "permission-mode" &&
       current.type !== "queued-menu" &&
       current.type !== "subagent-menu"
     ) {
@@ -708,6 +722,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                             queued={queuedPrompts}
                             variants={props.variants}
                             variantCycle={variantCycle()}
+                            permissionMode={() => (props.autoPermission() ? "auto" : "ask")}
                             onClose={closePanel}
                             onModel={openModel}
                             onEditor={() => {
@@ -716,6 +731,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                             }}
                             onSkill={openSkillMenu}
                             onSubagent={openSubagentMenu}
+                            onPermissionMode={openPermissionMode}
                             onQueued={openQueuedMenu}
                             onVariant={openVariant}
                             onVariantCycle={() => {
@@ -731,6 +747,17 @@ export function RunFooterView(props: RunFooterViewProps) {
                               closePanel()
                             }}
                             onExit={props.onExit}
+                          />
+                        </Match>
+                        <Match when={route().type === "permission-mode"}>
+                          <RunPermissionModeSelectBody
+                            theme={theme}
+                            current={() => (props.autoPermission() ? "auto" : "ask")}
+                            onClose={closePanel}
+                            onSelect={(mode) => {
+                              props.onPermissionModeSelect(mode)
+                              closePanel()
+                            }}
                           />
                         </Match>
                         <Match when={skilling()}>

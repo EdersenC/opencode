@@ -33,6 +33,10 @@ const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
+const INTERFACE_SKILL_NAME = "interface"
+const INTERFACE_SKILL_DESCRIPTION =
+  "Use after planning and before multiple coder agents edit adjacent parts of a codebase. Creates contract-first interfaces, handoff READMEs, work-package maps, ownership boundaries, coder dispatch prompts, and review focus."
+const INTERFACE_SKILL_BODY = SkillPlugin.InterfaceContent
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -280,6 +284,12 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+        }
+        s.skills[INTERFACE_SKILL_NAME] = {
+          name: INTERFACE_SKILL_NAME,
+          description: INTERFACE_SKILL_DESCRIPTION,
+          location: "<built-in>",
+          content: INTERFACE_SKILL_BODY,
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s

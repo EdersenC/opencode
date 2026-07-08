@@ -25,6 +25,7 @@ import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { autoRequestDecision, normalizeMode } from "@/permission/auto"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -68,6 +69,28 @@ type SessionInfo = {
   id: string
   title?: string
   directory?: string
+}
+
+function createSessionTreeMatcher(client: OpencodeClient, rootSessionID: string) {
+  const known = new Set([rootSessionID])
+
+  const refresh = async () => {
+    const queue = [...known]
+    for (let index = 0; index < queue.length; index++) {
+      const response = await client.session.children({ sessionID: queue[index]! }).catch(() => undefined)
+      for (const child of response?.data ?? []) {
+        if (known.has(child.id)) continue
+        known.add(child.id)
+        queue.push(child.id)
+      }
+    }
+  }
+
+  return async (sessionID: string) => {
+    if (known.has(sessionID)) return true
+    await refresh()
+    return known.has(sessionID)
+  }
 }
 
 function inline(info: Inline) {
@@ -241,8 +264,13 @@ export const RunCommand = effectCmd({
       })
       .option("auto", {
         type: "boolean",
-        describe: "auto-approve permissions that are not explicitly denied (dangerous!)",
+        describe: "auto-approve safe project-local bash permissions",
         default: false,
+      })
+      .option("permission-mode", {
+        type: "string",
+        choices: ["ask", "auto"],
+        describe: "permission mode to use for this run",
       })
       .option("yolo", {
         type: "boolean",
@@ -271,7 +299,10 @@ export const RunCommand = effectCmd({
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
-      const auto = args.auto || args.yolo || args["dangerously-skip-permissions"]
+      const permissionMode = normalizeMode(
+        args["permission-mode"] ?? (args.auto || args.yolo || args["dangerously-skip-permissions"] ? "auto" : "ask"),
+      )
+      const auto = permissionMode === "auto"
       const thinking = interactive ? (args.thinking ?? true) : (args.thinking ?? false)
       const die = (message: string): never => {
         UI.error(message)
@@ -690,11 +721,34 @@ export const RunCommand = effectCmd({
           return false
         }
 
+        const jsonParts = new Map<
+          string,
+          {
+            type: "reasoning" | "text" | "tool_use"
+            part: Record<string, unknown>
+          }
+        >()
+
+        function bufferJsonPart(type: "reasoning" | "text" | "tool_use", part: Record<string, unknown>) {
+          if (typeof part.id !== "string") return true
+          jsonParts.set(part.id, { type, part })
+          return true
+        }
+
+        function flushJsonParts() {
+          if (args.format !== "json" || jsonParts.size === 0) return
+          for (const item of [...jsonParts.values()].sort((a, b) => String(a.part.id).localeCompare(String(b.part.id)))) {
+            emit(item.type, { part: item.part })
+          }
+          jsonParts.clear()
+        }
+
         // Consume one subscribed event stream for the active session and mirror it
         // to stdout/UI. `client` is passed explicitly because attach mode may
         // rebind the SDK to the session's directory after the subscription is
         // created, and replies issued from inside the loop must use that client.
         async function loop(client: OpencodeClient, events: Awaited<ReturnType<typeof sdk.event.subscribe>>) {
+          const sessionInScope = createSessionTreeMatcher(client, sessionID)
           const toggles = new Map<string, boolean>()
           let error: string | undefined
 
@@ -717,7 +771,10 @@ export const RunCommand = effectCmd({
               if (part.sessionID !== sessionID) continue
 
               if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) {
-                if (emit("tool_use", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("tool_use", part as Record<string, unknown>)
+                  continue
+                }
                 if (part.state.status === "completed") {
                   await tool(part)
                   continue
@@ -738,15 +795,20 @@ export const RunCommand = effectCmd({
               }
 
               if (part.type === "step-start") {
+                flushJsonParts()
                 if (emit("step_start", { part })) continue
               }
 
               if (part.type === "step-finish") {
+                flushJsonParts()
                 if (emit("step_finish", { part })) continue
               }
 
               if (part.type === "text" && part.time?.end) {
-                if (emit("text", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("text", part as Record<string, unknown>)
+                  continue
+                }
                 const text = part.text.trim()
                 if (!text) continue
                 if (!process.stdout.isTTY) {
@@ -759,7 +821,10 @@ export const RunCommand = effectCmd({
               }
 
               if (part.type === "reasoning" && part.time?.end && thinking) {
-                if (emit("reasoning", { part })) continue
+                if (args.format === "json") {
+                  bufferJsonPart("reasoning", part as Record<string, unknown>)
+                  continue
+                }
                 const text = part.text.trim()
                 if (!text) continue
                 const line = `Thinking: ${text}`
@@ -781,6 +846,7 @@ export const RunCommand = effectCmd({
                 err = String(props.error.data.message)
               }
               error = error ? error + EOL + err : err
+              flushJsonParts()
               if (emit("error", { error: props.error })) continue
               UI.error(err)
             }
@@ -795,24 +861,34 @@ export const RunCommand = effectCmd({
 
             if (event.type === "permission.asked") {
               const permission = event.properties
-              if (permission.sessionID !== sessionID) continue
+              if (!(await sessionInScope(permission.sessionID))) continue
+              const decision = auto ? autoRequestDecision(permission, { enabled: true }) : undefined
 
-              if (auto) {
+              if (decision?.decision === "allow") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",
                 })
-              } else {
-                UI.println(
-                  UI.Style.TEXT_WARNING_BOLD + "!",
-                  UI.Style.TEXT_NORMAL +
-                    `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
-                )
+                continue
+              }
+
+              if (decision?.decision === "deny") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "reject",
                 })
+                continue
               }
+              const reason = decision?.reason ? `; ${decision.reason}` : ""
+              UI.println(
+                UI.Style.TEXT_WARNING_BOLD + "!",
+                UI.Style.TEXT_NORMAL +
+                  `permission requested: ${permission.permission} (${permission.patterns.join(", ")})${reason}; auto-rejecting`,
+              )
+              await client.permission.reply({
+                requestID: permission.id,
+                reply: "reject",
+              })
             }
           }
           return error
@@ -891,6 +967,7 @@ export const RunCommand = effectCmd({
             createSession: createFreshSession,
             thinking,
             backgroundSubagents: flags.experimentalBackgroundSubagents,
+            autoPermission: auto,
             demo: args.demo,
           })
         } catch (error) {
@@ -928,6 +1005,7 @@ export const RunCommand = effectCmd({
             initialInput,
             thinking,
             backgroundSubagents: flags.experimentalBackgroundSubagents,
+            autoPermission: auto,
             demo: args.demo,
           })
         } catch (error) {
@@ -971,6 +1049,8 @@ type MiniCommandInput = {
   prompt?: string
   replay?: boolean
   replayLimit?: number
+  permissionMode?: "ask" | "auto"
+  auto?: boolean
   demo?: boolean
 }
 
@@ -1002,7 +1082,9 @@ export async function runMini(input: MiniCommandInput) {
     replay: input.replay ?? true,
     "replay-limit": input.replayLimit,
     replayLimit: input.replayLimit,
-    auto: false,
+    "permission-mode": input.permissionMode ?? (input.auto ? "auto" : "ask"),
+    permissionMode: input.permissionMode ?? (input.auto ? "auto" : "ask"),
+    auto: input.auto ?? false,
     yolo: false,
     "dangerously-skip-permissions": false,
     dangerouslySkipPermissions: false,

@@ -15,12 +15,21 @@
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { MessageID } from "@/session/schema"
+import { canAutoApproveRequest, canAutoDenyRequest } from "@/permission/auto"
 import { createRunDemo } from "./demo"
 import { resolveModelInfo, resolveRunTuiConfig, resolveSessionInfo } from "./runtime.boot"
 import { createRuntimeLifecycle } from "./runtime.lifecycle"
 import { trace } from "./trace"
 import { cycleVariant, formatModelLabel, resolveSavedVariant, resolveVariant, saveVariant } from "./variant.shared"
-import type { LocalReplayAnchor, LocalReplayRow, RunInput, RunPrompt, RunProvider, StreamCommit } from "./types"
+import type {
+  LocalReplayAnchor,
+  LocalReplayRow,
+  RunInput,
+  RunPermissionMode,
+  RunPrompt,
+  RunProvider,
+  StreamCommit,
+} from "./types"
 
 /** @internal Exported for testing */
 export { pickVariant, resolveVariant } from "./variant.shared"
@@ -52,6 +61,7 @@ type RunRuntimeInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   replay?: boolean
   replayLimit?: number
   demo?: RunInput["demo"]
@@ -71,6 +81,7 @@ type RunLocalInput = {
   initialInput?: string
   thinking: boolean
   backgroundSubagents: boolean
+  autoPermission: boolean
   replay?: boolean
   replayLimit?: number
   demo?: RunInput["demo"]
@@ -127,6 +138,7 @@ type RuntimeState = {
   sessionID: string
   history: RunPrompt[]
   localRows: LocalReplayRow[]
+  autoPermission: boolean
   sessionTitle?: string
   agent: string | undefined
   switching?: Promise<void>
@@ -205,6 +217,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
     sessionID: ctx.sessionID,
     history: [...session.history],
     localRows: [],
+    autoPermission: input.autoPermission,
     sessionTitle: ctx.sessionTitle,
     agent: ctx.agent,
   }
@@ -244,6 +257,10 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
     variant: state.activeVariant,
     tuiConfig,
     backgroundSubagents: input.backgroundSubagents,
+    autoPermission: input.autoPermission,
+    onPermissionModeSelect: (mode: RunPermissionMode) => {
+      state.autoPermission = mode === "auto"
+    },
     onPermissionReply: async (next) => {
       if (state.demo?.permission(next)) {
         return
@@ -483,6 +500,33 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         providers: () => state.providers,
         footer,
         trace: log,
+        onAutoPermission: (request) => {
+          if (!state.autoPermission) {
+            return false
+          }
+
+          if (canAutoApproveRequest(request, { enabled: true })) {
+            void ctx.sdk.permission
+              .reply({
+                requestID: request.id,
+                reply: "once",
+              })
+              .catch(() => {})
+            return true
+          }
+
+          if (canAutoDenyRequest(request, { enabled: true })) {
+            void ctx.sdk.permission
+              .reply({
+                requestID: request.id,
+                reply: "reject",
+              })
+              .catch(() => {})
+            return true
+          }
+
+          return false
+        },
       })
       if (footer.isClosed) {
         await handle.close()
@@ -605,7 +649,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
                 type: "stream.patch",
                 patch: {
                   phase: "idle",
-                  duration: "",
+                  timing: "",
                   usage: "",
                   first: true,
                 },
@@ -745,6 +789,7 @@ export async function runInteractiveLocalMode(input: RunLocalInput): Promise<voi
     initialInput: input.initialInput,
     thinking: input.thinking,
     backgroundSubagents: input.backgroundSubagents,
+    autoPermission: input.autoPermission,
     replay: input.replay,
     replayLimit: input.replayLimit,
     demo: input.demo,
@@ -794,6 +839,7 @@ export async function runInteractiveMode(
       initialInput: input.initialInput,
       thinking: input.thinking,
       backgroundSubagents: input.backgroundSubagents,
+      autoPermission: input.autoPermission,
       replay: input.replay,
       replayLimit: input.replayLimit,
       demo: input.demo,

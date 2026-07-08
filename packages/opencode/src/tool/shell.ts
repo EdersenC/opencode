@@ -21,6 +21,7 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import { shellApproval } from "@/permission/auto"
 
 export { Parameters } from "./shell/prompt"
 
@@ -260,9 +261,13 @@ const parse = Effect.fn("ShellTool.parse")(function* (command: string, ps: boole
   return tree
 })
 
-const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan, input: { command: string }) {
+const ask = Effect.fn("ShellTool.ask")(function* (
+  ctx: Tool.Context,
+  scan: Scan,
+  input: { command: string; cwd: string; projectRoot: string },
+) {
+  const directories = Array.from(scan.dirs)
   if (scan.dirs.size > 0) {
-    const directories = Array.from(scan.dirs)
     const globs = directories.map((dir) => {
       if (process.platform === "win32") return FSUtil.normalizePathPattern(path.join(dir, "*"))
       return path.join(dir, "*")
@@ -280,12 +285,20 @@ const ask = Effect.fn("ShellTool.ask")(function* (ctx: Tool.Context, scan: Scan,
   }
 
   if (scan.patterns.size === 0) return
+  const patterns = Array.from(scan.patterns)
   yield* ctx.ask({
     permission: ShellID.ToolID,
-    patterns: Array.from(scan.patterns),
+    patterns,
     always: Array.from(scan.always),
     metadata: {
       command: input.command,
+      autoApprove: shellApproval({
+        command: input.command,
+        cwd: input.cwd,
+        projectRoot: input.projectRoot,
+        patterns,
+        externalDirectories: directories,
+      }),
     },
   })
 })
@@ -624,7 +637,11 @@ export const ShellTool = Tool.define(
                   )
                   const scan = yield* collect(tree.rootNode, cwd, ps, shell, instanceCtx)
                   if (!containsPath(cwd, instanceCtx)) scan.dirs.add(cwd)
-                  yield* ask(ctx, scan, params)
+                  yield* ask(ctx, scan, {
+                    command: params.command,
+                    cwd,
+                    projectRoot: instanceCtx.worktree,
+                  })
                 }),
               )
 

@@ -276,9 +276,10 @@ file, `disable: true` in frontmatter.
 
 ### Built-in agents
 
-opencode ships with `build`, `plan`, `general`, `explore`. Hidden internal agents:
-`compaction`, `title`, `summary`. To override a built-in's fields, define the
-same key in `agent: { <name>: { ... } }`.
+opencode ships with primary agents `build`, `plan`, `orchestrate` and subagents
+`general`, `explore`, `planner`, `coder`, `scout`. Hidden internal agents:
+`compaction`, `title`, `summary`. To override a built-in's fields, define the same key in
+`agent: { <name>: { ... } }`.
 
 ## Commands
 
@@ -409,7 +410,7 @@ rules last.
 `permission: "allow"` (a string at the top level) is shorthand for "allow
 everything" and is rarely what the user wants.
 
-Known permission keys: `read, edit, glob, grep, list, bash, task,
+Known permission keys: `read, edit, glob, grep, list, bash, group, task,
 external_directory, todowrite, question, webfetch, websearch, lsp, doom_loop,
 skill`. Some of these (`todowrite,
 question, webfetch, websearch, doom_loop`) only accept a flat
